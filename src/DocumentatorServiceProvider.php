@@ -9,14 +9,17 @@ class DocumentatorServiceProvider extends ServiceProvider
 {
     public function register(): void
     {
-        $this->mergeConfigFrom(__DIR__ . '/../config/documentator.php', 'openapi');
+        $this->mergeConfigFrom(__DIR__.'/../config/documentator.php', 'documentator');
     }
 
     public function boot(): void
     {
         if ($this->app->runningInConsole()) {
+
+            $this->loadTranslationsFrom(__DIR__.'/../lang', 'documentator');
+
             $this->publishes([
-                __DIR__ . '/../config/documentator.php' => config_path('documentator.php'),
+                __DIR__.'/../config/documentator.php' => config_path('documentator.php'),
             ], 'documentator-config');
 
             $this->commands([

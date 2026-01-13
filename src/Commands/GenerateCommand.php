@@ -20,33 +20,6 @@ class GenerateCommand extends Command implements Isolatable
         'patch' => 'blue', 'delete' => 'red',
     ];
 
-    private const array TRANSLATIONS = [
-        'en' => [
-            'list' => 'List :resource',
-            'get' => 'Get :resource',
-            'create' => 'Create :resource',
-            'update' => 'Update :resource',
-            'delete' => 'Delete :resource',
-            'id_of' => 'ID of :name',
-            'max' => 'max :value',
-            'min' => 'min :value',
-            'unique' => 'unique',
-            'exists' => 'must exist',
-        ],
-        'ru' => [
-            'list' => 'Список :resource',
-            'get' => 'Получить :resource',
-            'create' => 'Создать :resource',
-            'update' => 'Обновить :resource',
-            'delete' => 'Удалить :resource',
-            'id_of' => 'ID :name',
-            'max' => 'макс. :value',
-            'min' => 'мин. :value',
-            'unique' => 'уникальное',
-            'exists' => 'должно существовать',
-        ],
-    ];
-
     protected $signature = 'docs:generate 
                             {--output= : Override output path}
                             {--format= : Override response format}';
@@ -54,10 +27,15 @@ class GenerateCommand extends Command implements Isolatable
     protected $description = 'Generate OpenAPI specification';
 
     private ResponseFormat $format;
+
     private array $config;
+
     private array $schemas = [];
+
     private array $fileCache = [];
+
     private array $usedTags = [];
+
     private int $processed = 0;
 
     public function handle(): int
@@ -70,9 +48,8 @@ class GenerateCommand extends Command implements Isolatable
 
         $this->format = $this->resolveFormat();
 
-        $this->info("Generating OpenAPI specification...");
+        $this->info('Generating OpenAPI specification...');
         $this->line("  <fg=gray>Format:</> {$this->format->name()}");
-        $this->line("  <fg=gray>Locale:</> {$this->config['locale']}");
         $this->newLine();
 
         try {
@@ -87,20 +64,22 @@ class GenerateCommand extends Command implements Isolatable
 
             if (file_put_contents($path, $json) === false) {
                 $this->error("Failed to write: {$path}");
+
                 return self::FAILURE;
             }
 
             $this->newLine();
             $this->info('✓ Generated successfully');
             $this->line("  <fg=gray>Routes:</> {$this->processed}");
-            $this->line("  <fg=gray>Endpoints:</> " . count($spec['paths']));
-            $this->line("  <fg=gray>Schemas:</> " . count($spec['components']['schemas']));
-            $this->line("  <fg=gray>Size:</> " . round(strlen($json) / 1024, 2) . ' KB');
+            $this->line('  <fg=gray>Endpoints:</> '.count($spec['paths']));
+            $this->line('  <fg=gray>Schemas:</> '.count($spec['components']['schemas']));
+            $this->line('  <fg=gray>Size:</> '.round(strlen($json) / 1024, 2).' KB');
             $this->line("  <fg=gray>Output:</> {$path}");
 
             return self::SUCCESS;
         } catch (JsonException $e) {
-            $this->error('JSON error: ' . $e->getMessage());
+            $this->error('JSON error: '.$e->getMessage());
+
             return self::FAILURE;
         }
     }
@@ -115,16 +94,16 @@ class GenerateCommand extends Command implements Isolatable
         ], $this->config['formats'] ?? []);
 
         if (class_exists($format)) {
-            return new $format();
+            return new $format;
         }
 
-        if (!isset($formats[$format])) {
+        if (! isset($formats[$format])) {
             throw new \InvalidArgumentException(
-                "Unknown format: {$format}. Available: " . implode(', ', array_keys($formats))
+                "Unknown format: {$format}. Available: ".implode(', ', array_keys($formats))
             );
         }
 
-        return new $formats[$format]();
+        return new $formats[$format];
     }
 
     private function build(): array
@@ -153,7 +132,7 @@ class GenerateCommand extends Command implements Isolatable
             ],
         ];
 
-        if (!empty($this->config['security']['default'])) {
+        if (! empty($this->config['security']['default'])) {
             $spec['security'] = array_map(fn ($scheme) => [$scheme => []], $this->config['security']['default']);
         }
 
@@ -188,6 +167,7 @@ class GenerateCommand extends Command implements Isolatable
 
         if ($routes->isEmpty()) {
             $this->warn('No routes found matching criteria');
+
             return [];
         }
 
@@ -205,7 +185,7 @@ class GenerateCommand extends Command implements Isolatable
 
             $this->outputProgress($route, $routeMethods, $total);
 
-            $path = '/' . ltrim(preg_replace('/\{([^}]+)\?}/', '{$1}', $route->uri()), '/');
+            $path = '/'.ltrim(preg_replace('/\{([^}]+)\?}/', '{$1}', $route->uri()), '/');
 
             foreach ($routeMethods as $method) {
                 $paths[$path][$method] = $this->buildOperation($route, $method);
@@ -305,7 +285,8 @@ class GenerateCommand extends Command implements Isolatable
         if ($name = $route->getName()) {
             return str_replace('.', '_', $name);
         }
-        return strtolower($method) . '_' . Str::snake(implode('_', $segments) ?: 'root');
+
+        return strtolower($method).'_'.Str::snake(implode('_', $segments) ?: 'root');
     }
 
     private function buildParameters(Route $route, string $method, array $doc): array
@@ -326,7 +307,7 @@ class GenerateCommand extends Command implements Isolatable
         if ($method === 'get') {
             foreach ($doc['queryParams'] ?? [] as $p) {
                 $name = str_contains($p['name'], '.')
-                    ? explode('.', $p['name'])[0] . '[' . implode('][', array_slice(explode('.', $p['name']), 1)) . ']'
+                    ? explode('.', $p['name'])[0].'['.implode('][', array_slice(explode('.', $p['name']), 1)).']'
                     : $p['name'];
 
                 $params[] = [
@@ -388,6 +369,7 @@ class GenerateCommand extends Command implements Isolatable
                 if ($isRequired) {
                     $props[$arrayField]['items']['required'][] = $itemField;
                 }
+
                 continue;
             }
 
@@ -417,7 +399,7 @@ class GenerateCommand extends Command implements Isolatable
                     $props[$arrayField]['items']['required'][] = $itemField;
                 }
             } else {
-                if ($p['required'] && !in_array($p['name'], $required)) {
+                if ($p['required'] && ! in_array($p['name'], $required)) {
                     $required[] = $p['name'];
                 }
                 $props[$p['name']] = [
@@ -475,7 +457,7 @@ class GenerateCommand extends Command implements Isolatable
             };
         }
 
-        return $desc ? Str::headline($field) . ' (' . implode(', ', $desc) . ')' : Str::headline($field);
+        return $desc ? Str::headline($field).' ('.implode(', ', $desc).')' : Str::headline($field);
     }
 
     private function buildResponses(array $doc): array
@@ -504,23 +486,24 @@ class GenerateCommand extends Command implements Isolatable
     {
         $action = $route->getActionName();
 
-        if ($action === 'Closure' || !str_contains($action, '@')) {
+        if ($action === 'Closure' || ! str_contains($action, '@')) {
             return [];
         }
 
         [$class, $method] = explode('@', $action, 2);
 
-        if (!class_exists($class)) {
+        if (! class_exists($class)) {
             return [];
         }
 
         try {
             $ref = new ReflectionClass($class);
-            if (!$ref->hasMethod($method)) {
+            if (! $ref->hasMethod($method)) {
                 return [];
             }
 
             $docComment = $ref->getMethod($method)->getDocComment();
+
             return $docComment ? $this->parseDoc($docComment) : [];
         } catch (Throwable) {
             return [];
@@ -537,7 +520,7 @@ class GenerateCommand extends Command implements Isolatable
 
         $lines = array_filter(
             array_map(fn ($l) => ltrim(trim($l), "* \t"), preg_split('/\R/', $doc) ?: []),
-            fn ($l) => !in_array(trim($l), ['/**', '*/'])
+            fn ($l) => ! in_array(trim($l), ['/**', '*/'])
         );
 
         $descLines = [];
@@ -556,32 +539,40 @@ class GenerateCommand extends Command implements Isolatable
 
             if (preg_match('/^@summary\s+(.+)$/i', $line, $m)) {
                 $info['summary'] = trim($m[1]);
+
                 continue;
             }
             if (preg_match('/^@description(?:\s+(.*))?$/i', $line, $m)) {
                 $inDesc = true;
-                if (!empty($m[1])) {
+                if (! empty($m[1])) {
                     $descLines[] = trim($m[1]);
-                } continue;
+                }
+
+                continue;
             }
             if (preg_match('/^@group\s+(.+)$/i', $line, $m)) {
                 $info['group'] = trim($m[1]);
+
                 continue;
             }
             if (preg_match('/^@resource\s+(\S+)/i', $line, $m)) {
                 $info['resource'] = $m[1];
+
                 continue;
             }
             if (preg_match('/^@deprecated/i', $line)) {
                 $info['deprecated'] = true;
+
                 continue;
             }
             if (preg_match('/^@authenticated/i', $line)) {
                 $info['authenticated'] = true;
+
                 continue;
             }
             if (preg_match('/^@unauthenticated/i', $line)) {
                 $info['authenticated'] = false;
+
                 continue;
             }
 
@@ -589,6 +580,7 @@ class GenerateCommand extends Command implements Isolatable
                 $content = trim($m[2]);
                 $decoded = json_decode($content, true);
                 $info['responses'][] = ['status' => (int) ($m[1] ?: 200), 'content' => json_last_error() === JSON_ERROR_NONE ? $decoded : $content];
+
                 continue;
             }
 
@@ -597,19 +589,22 @@ class GenerateCommand extends Command implements Isolatable
                     if ($param = $this->parseParam($m[1])) {
                         $info[$key][] = $param;
                     }
+
                     continue 2;
                 }
             }
 
-            if ($inDesc && !str_starts_with($line, '@')) {
+            if ($inDesc && ! str_starts_with($line, '@')) {
                 $descLines[] = $line;
+
                 continue;
             }
-            if ($info['summary'] === null && !str_starts_with($line, '@')) {
+            if ($info['summary'] === null && ! str_starts_with($line, '@')) {
                 $info['summary'] = $line;
+
                 continue;
             }
-            if ($info['summary'] !== null && !$foundAnnotation && !str_starts_with($line, '@')) {
+            if ($info['summary'] !== null && ! $foundAnnotation && ! str_starts_with($line, '@')) {
                 $clean = strip_tags($line);
                 if ($clean) {
                     $descLines[] = $clean;
@@ -645,19 +640,19 @@ class GenerateCommand extends Command implements Isolatable
     {
         $action = $route->getActionName();
 
-        if ($action === 'Closure' || !str_contains($action, '@')) {
+        if ($action === 'Closure' || ! str_contains($action, '@')) {
             return [];
         }
 
         [$class, $methodName] = explode('@', $action, 2);
 
-        if (!class_exists($class)) {
+        if (! class_exists($class)) {
             return [];
         }
 
         try {
             $ref = new ReflectionClass($class);
-            if (!$ref->hasMethod($methodName)) {
+            if (! $ref->hasMethod($methodName)) {
                 return [];
             }
 
@@ -665,17 +660,17 @@ class GenerateCommand extends Command implements Isolatable
 
             foreach ($method->getParameters() as $param) {
                 $type = $param->getType();
-                if (!$type instanceof ReflectionNamedType) {
+                if (! $type instanceof ReflectionNamedType) {
                     continue;
                 }
 
                 $typeName = $type->getName();
-                if (!class_exists($typeName) || !is_subclass_of($typeName, 'Illuminate\Foundation\Http\FormRequest')) {
+                if (! class_exists($typeName) || ! is_subclass_of($typeName, 'Illuminate\Foundation\Http\FormRequest')) {
                     continue;
                 }
 
                 $formRef = new ReflectionClass($typeName);
-                if (!$formRef->hasMethod('rules')) {
+                if (! $formRef->hasMethod('rules')) {
                     continue;
                 }
 
@@ -686,7 +681,7 @@ class GenerateCommand extends Command implements Isolatable
             }
 
             $file = $ref->getFileName();
-            if (!$file || !file_exists($file)) {
+            if (! $file || ! file_exists($file)) {
                 return [];
             }
 
@@ -696,6 +691,7 @@ class GenerateCommand extends Command implements Isolatable
 
             if (preg_match('/\$\w+->validate\(\s*\[(.*?)]\s*\)/s', $code, $m)) {
                 preg_match_all('/[\'"]([^\'"]+)[\'"]\s*=>\s*[\'"]([^\'"]+)[\'"]/', $m[1], $matches, PREG_SET_ORDER);
+
                 return array_column($matches, 2, 1);
             }
         } catch (Throwable) {
@@ -706,7 +702,7 @@ class GenerateCommand extends Command implements Isolatable
 
     private function extractTags(Route $route, array $doc): array
     {
-        if (!empty($doc['group'])) {
+        if (! empty($doc['group'])) {
             return [$doc['group']];
         }
 
@@ -717,6 +713,7 @@ class GenerateCommand extends Command implements Isolatable
         }
 
         $segments = explode('/', trim($route->uri(), '/'), 2);
+
         return [Str::headline($segments[0] ?? 'Default')];
     }
 
@@ -726,34 +723,26 @@ class GenerateCommand extends Command implements Isolatable
             return Str::headline(str_replace('.', ' ', $name));
         }
 
-        $resource = Str::singular(Str::snake($segments ? end($segments) : 'resource'));
+        $resource = Str::singular(
+            Str::snake($segments ? end($segments) : 'resource')
+        );
+
         $uriSegments = explode('/', trim($route->uri(), '/'));
-        $isCollection = !str_starts_with($uriSegments ? end($uriSegments) : '', '{');
+        $isCollection = ! str_starts_with($uriSegments ? end($uriSegments) : '', '{');
 
         return match ($method) {
-            'get' => $this->trans($isCollection ? 'list' : 'get', ['resource' => $resource]),
-            'post' => $this->trans('create', ['resource' => $resource]),
-            'put', 'patch' => $this->trans('update', ['resource' => $resource]),
-            'delete' => $this->trans('delete', ['resource' => $resource]),
+            'get' => __('api.'.($isCollection ? 'list' : 'get'), ['resource' => $resource]),
+            'post' => __('api.create', ['resource' => $resource]),
+            'put',
+            'patch' => __('api.update', ['resource' => $resource]),
+            'delete' => __('api.delete', ['resource' => $resource]),
             default => $route->uri(),
         };
     }
 
-    private function trans(string $key, array $replace = []): string
-    {
-        $locale = $this->config['locale'] ?? 'en';
-        $text = self::TRANSLATIONS[$locale][$key] ?? self::TRANSLATIONS['en'][$key] ?? $key;
-
-        foreach ($replace as $k => $v) {
-            $text = str_replace(":{$k}", $v, $text);
-        }
-
-        return $text;
-    }
-
     private function pathSegments(Route $route): array
     {
-        return array_values(array_filter(explode('/', $route->uri()), fn ($s) => !str_starts_with($s, '{')));
+        return array_values(array_filter(explode('/', $route->uri()), fn ($s) => ! str_starts_with($s, '{')));
     }
 
     private function normalizeType(string $type): string
@@ -766,13 +755,14 @@ class GenerateCommand extends Command implements Isolatable
         if (str_starts_with($path, '/') || preg_match('#^[A-Za-z]:[/\\\\]#', $path)) {
             return $path;
         }
+
         return base_path($path);
     }
 
     private function ensureDirectory(string $path): void
     {
         $dir = dirname($path);
-        if (!is_dir($dir)) {
+        if (! is_dir($dir)) {
             @mkdir($dir, 0755, true);
         }
     }
@@ -785,6 +775,7 @@ class GenerateCommand extends Command implements Isolatable
         if (is_array($data)) {
             return array_map($this->sanitizeUtf8(...), $data);
         }
+
         return $data;
     }
 }

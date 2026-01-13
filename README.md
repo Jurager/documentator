@@ -11,7 +11,7 @@ Generate OpenAPI 3.0 specification from Laravel routes with automatic schema ext
 - Automatic schema generation
 - PHPDoc annotations support (@summary, @group, @response, etc.)
 - Security schemes (Bearer, API Key, OAuth2)
-- Localization (en, ru)
+- Localizable
 - Multiple response formats (REST, JSON:API, custom)
 - Fully configurable
 
