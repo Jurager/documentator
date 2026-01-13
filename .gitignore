@@ -1,0 +1,7 @@
+.idea
+.editorconfig
+/vendor
+composer.lock
+pint.json
+/phpunit.xml
+.phpunit.result.cache
