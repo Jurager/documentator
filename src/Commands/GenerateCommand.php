@@ -20,7 +20,7 @@ class GenerateCommand extends Command implements Isolatable
         'patch' => 'blue', 'delete' => 'red',
     ];
 
-    protected $signature = 'docs:generate 
+    protected $signature = 'docs:generate
                             {--output= : Override output path}
                             {--format= : Override response format}';
 
@@ -33,6 +33,8 @@ class GenerateCommand extends Command implements Isolatable
     private array $schemas = [];
 
     private array $fileCache = [];
+
+    private array $reflectionCache = [];
 
     private array $usedTags = [];
 
@@ -62,7 +64,7 @@ class GenerateCommand extends Command implements Isolatable
             $path = $this->resolvePath($this->option('output') ?: $this->config['output']);
 
             $this->ensureDirectory($path);
-            $json = json_encode($spec, JSON_THROW_ON_ERROR | JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE);
+            $json = json_encode($spec, JSON_THROW_ON_ERROR | JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE | JSON_INVALID_UTF8_IGNORE);
 
             if (file_put_contents($path, $json) === false) {
                 $this->error("Failed to write: {$path}");
@@ -89,7 +91,6 @@ class GenerateCommand extends Command implements Isolatable
 
     /**
      * Resolve response format implementation.
-     *
      *
      * @throws \InvalidArgumentException When format is unknown
      */
@@ -217,6 +218,7 @@ class GenerateCommand extends Command implements Isolatable
         }
 
         $this->fileCache = [];
+        $this->reflectionCache = [];
         ksort($paths);
 
         return $paths;
@@ -285,6 +287,31 @@ class GenerateCommand extends Command implements Isolatable
             $this->usedTags[$tag] = true;
         }
 
+        // Определяем ресурс для генерации ответов
+        $resource = $doc['resource'] ?? Str::singular(Str::snake($segments ? end($segments) : 'resource'));
+
+        // Строим requestBody и получаем атрибуты для ответов
+        $requestBody = null;
+        $requestAttributes = null;
+
+        if (in_array($method, ['post', 'put', 'patch'])) {
+            $requestBody = $this->buildRequestBody($route, $method, $doc, $segments);
+
+            // Извлекаем атрибуты из схемы запроса для генерации примеров ответа
+            if ($requestBody) {
+                $schemaRef = $requestBody['content']['application/json']['schema']['$ref'] ?? null;
+                if ($schemaRef) {
+                    $schemaName = str_replace('#/components/schemas/', '', $schemaRef);
+                    $requestAttributes = $this->schemas[$schemaName]['properties'] ?? null;
+                }
+            }
+        }
+
+        // Определяем, это коллекция или единичный ресурс
+        $uriSegments = explode('/', trim($route->uri(), '/'));
+        $lastSegment = $uriSegments ? end($uriSegments) : '';
+        $isCollection = $method === 'get' && ! str_starts_with($lastSegment, '{');
+
         $operation = array_filter([
             'operationId' => $this->operationId($route, $method, $segments),
             'summary' => $doc['summary'] ?? $this->generateSummary($route, $method, $segments),
@@ -292,10 +319,8 @@ class GenerateCommand extends Command implements Isolatable
             'tags' => $tags,
             'deprecated' => $doc['deprecated'] ?? null,
             'parameters' => $this->buildParameters($route, $method, $doc) ?: null,
-            'requestBody' => in_array($method, ['post', 'put', 'patch'])
-                ? $this->buildRequestBody($route, $method, $doc, $segments)
-                : null,
-            'responses' => $this->buildResponses($doc),
+            'requestBody' => $requestBody,
+            'responses' => $this->buildResponses($method, $resource, $doc, $requestAttributes, $isCollection),
         ]);
 
         foreach ($this->config['default_responses'] ?? [] as $status => $response) {
@@ -335,7 +360,7 @@ class GenerateCommand extends Command implements Isolatable
                 'in' => 'path',
                 'required' => $urlParam['required'] ?? true,
                 'schema' => ['type' => $this->normalizeType($urlParam['type'] ?? 'string')],
-                'description' => $urlParam['description'] ?? $this->trans('id_of', ['name' => Str::headline($name)]),
+                'description' => $urlParam['description'] ?? __('documentator::messages.id_of', ['name' => Str::headline($name)]),
             ];
         }
 
@@ -503,11 +528,11 @@ class GenerateCommand extends Command implements Isolatable
 
         foreach ($rules as $rule) {
             match (true) {
-                str_starts_with($rule, 'max:') => $desc[] = $this->trans('max', ['value' => substr($rule, 4)]),
-                str_starts_with($rule, 'min:') => $desc[] = $this->trans('min', ['value' => substr($rule, 4)]),
+                str_starts_with($rule, 'max:') => $desc[] = __('documentator::messages.max', ['value' => substr($rule, 4)]),
+                str_starts_with($rule, 'min:') => $desc[] = __('documentator::messages.min', ['value' => substr($rule, 4)]),
                 $rule === 'email' => $desc[] = 'email',
-                str_starts_with($rule, 'unique') => $desc[] = $this->trans('unique'),
-                str_starts_with($rule, 'exists:') => $desc[] = $this->trans('exists'),
+                str_starts_with($rule, 'unique') => $desc[] = __('documentator::messages.unique'),
+                str_starts_with($rule, 'exists:') => $desc[] = __('documentator::messages.exists'),
                 default => null,
             };
         }
@@ -515,26 +540,40 @@ class GenerateCommand extends Command implements Isolatable
         return $desc ? Str::headline($field).' ('.implode(', ', $desc).')' : Str::headline($field);
     }
 
-    private function buildResponses(array $doc): array
+    /**
+     * Build OpenAPI responses section.
+     *
+     * @param  string  $method  HTTP method
+     * @param  string  $resource  Resource name
+     * @param  array<string, mixed>  $doc  Parsed PHPDoc
+     * @param  array<string, mixed>|null  $attributes  Request body attributes for response examples
+     * @param  bool  $isCollection  Whether this is a collection endpoint
+     * @return array<string, mixed>
+     */
+    private function buildResponses(string $method, string $resource, array $doc, ?array $attributes, bool $isCollection): array
     {
-        if (empty($doc['responses'])) {
-            return ['200' => ['description' => 'Success']];
+        // Если есть явно заданные ответы в PHPDoc — используем их
+        if (! empty($doc['responses'])) {
+            $statusDesc = $this->config['status_descriptions'] ?? [];
+            $responses = [];
+
+            foreach ($doc['responses'] as $r) {
+                $status = (string) $r['status'];
+                $responses[$status] = [
+                    'description' => $statusDesc[$r['status']] ?? "HTTP {$status}",
+                    'content' => ['application/json' => [
+                        'schema' => is_array($r['content'])
+                            ? ['example' => $r['content']]
+                            : ['type' => 'string', 'example' => $r['content']],
+                    ]],
+                ];
+            }
+
+            return $responses;
         }
 
-        $statusDesc = $this->config['status_descriptions'] ?? [];
-        $responses = [];
-
-        foreach ($doc['responses'] as $r) {
-            $status = (string) $r['status'];
-            $responses[$status] = [
-                'description' => $statusDesc[$r['status']] ?? "HTTP {$status}",
-                'content' => ['application/json' => [
-                    'schema' => is_array($r['content']) ? ['example' => $r['content']] : ['type' => 'string', 'example' => $r['content']],
-                ]],
-            ];
-        }
-
-        return $responses;
+        // Иначе генерируем ответ через формат
+        return $this->format->operationResponse($method, $resource, $attributes, $isCollection);
     }
 
     /**
@@ -557,7 +596,6 @@ class GenerateCommand extends Command implements Isolatable
         }
 
         try {
-
             $ref = $this->reflect($class);
 
             if (! $ref->hasMethod($method)) {
@@ -605,7 +643,6 @@ class GenerateCommand extends Command implements Isolatable
         $parsingText = true;
 
         foreach ($lines as $line) {
-
             if (str_starts_with($line, '@')) {
                 $parsingText = false;
             }
@@ -677,10 +714,10 @@ class GenerateCommand extends Command implements Isolatable
             }
 
             foreach ([
-                'queryParam' => 'queryParams',
-                'bodyParam' => 'bodyParams',
-                'urlParam' => 'urlParams',
-            ] as $tag => $key) {
+                         'queryParam' => 'queryParams',
+                         'bodyParam' => 'bodyParams',
+                         'urlParam' => 'urlParams',
+                     ] as $tag => $key) {
                 if (preg_match("/^@{$tag}\s+(.+)$/i", $line, $m)) {
                     if ($param = $this->parseParam($m[1])) {
                         $info[$key][] = $param;
@@ -751,7 +788,6 @@ class GenerateCommand extends Command implements Isolatable
             $method = $ref->getMethod($methodName);
 
             foreach ($method->getParameters() as $param) {
-
                 $type = $param->getType();
 
                 if (! $type instanceof ReflectionNamedType) {
@@ -835,11 +871,10 @@ class GenerateCommand extends Command implements Isolatable
         $isCollection = ! str_starts_with($uriSegments ? end($uriSegments) : '', '{');
 
         return match ($method) {
-            'get' => __('api.'.($isCollection ? 'list' : 'get'), ['resource' => $resource]),
-            'post' => __('api.create', ['resource' => $resource]),
-            'put',
-            'patch' => __('api.update', ['resource' => $resource]),
-            'delete' => __('api.delete', ['resource' => $resource]),
+            'get' => __('documentator::messages.'.($isCollection ? 'list' : 'get'), ['resource' => $resource]),
+            'post' => __('documentator::messages.create', ['resource' => $resource]),
+            'put', 'patch' => __('documentator::messages.update', ['resource' => $resource]),
+            'delete' => __('documentator::messages.delete', ['resource' => $resource]),
             default => $route->uri(),
         };
     }
