@@ -62,7 +62,7 @@ class GenerateCommand extends Command implements Isolatable
 
     public function handle(): int
     {
-        $this->config = config('openapi');
+        $this->config = config('documentator');
 
         if ($formatOverride = $this->option('format')) {
             $this->config['format'] = $formatOverride;

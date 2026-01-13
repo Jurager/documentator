@@ -75,7 +75,7 @@ return [
 
     // Custom formats
     'formats' => [
-        // 'telegram' => App\OpenApi\TelegramFormat::class,
+        // 'telegram' => App\Documentator\TelegramFormat::class,
     ],
 
     // Route filtering
@@ -177,7 +177,7 @@ public function legacyEndpoint()
 ## Custom Response Format
 
 ```php
-namespace App\OpenApi;
+namespace App\Documentator;
 
 use Jurager\Documentator\Formats\AbstractFormat;
 
@@ -232,7 +232,7 @@ Register in config:
 
 ```php
 'formats' => [
-    'telegram' => App\OpenApi\TelegramFormat::class,
+    'telegram' => App\Documentator\TelegramFormat::class,
 ],
 'format' => 'telegram',
 ```

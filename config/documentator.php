@@ -86,7 +86,7 @@ return [
     */
 
     'formats' => [
-        // 'custom' => App\OpenApi\CustomResponseFormat::class,
+        // 'custom' => App\Documentator\CustomResponseFormat::class,
     ],
 
     /*
