@@ -1,15 +1,19 @@
-# Laravel OpenAPI Generator
+# Jurager/Documentator
+[![Latest Stable Version](https://poser.pugx.org/jurager/documentator/v/stable)](https://packagist.org/packages/jurager/documentator)
+[![Total Downloads](https://poser.pugx.org/jurager/documentator/downloads)](https://packagist.org/packages/jurager/documentator)
+[![PHP Version Require](https://poser.pugx.org/jurager/documentator/require/php)](https://packagist.org/packages/jurager/documentator)
+[![License](https://poser.pugx.org/jurager/documentator/license)](https://packagist.org/packages/jurager/documentator)
 
-Generate OpenAPI 3.0 specification from Laravel routes with automatic schema extraction from FormRequest validation rules.
+Generate OpenAPI 3.0 specification from Laravel routes with automatic schema extraction.
 
 ## Features
 
-- 🚀 Automatic schema generation from FormRequest validation rules
-- 📝 PHPDoc annotations support (@summary, @group, @response, etc.)
-- 🔐 Security schemes (Bearer, API Key, OAuth2)
-- 🌍 Localization (en, ru)
-- 🎨 Multiple response formats (REST, JSON:API, custom)
-- ⚙️ Fully configurable via config file
+- Automatic schema generation
+- PHPDoc annotations support (@summary, @group, @response, etc.)
+- Security schemes (Bearer, API Key, OAuth2)
+- Localization (en, ru)
+- Multiple response formats (REST, JSON:API, custom)
+- Fully configurable
 
 ## Installation
 
@@ -258,4 +262,4 @@ Supported rules → OpenAPI mapping:
 
 ## License
 
-MIT
+This package is open-sourced software licensed under the [MIT license](LICENSE.md).
