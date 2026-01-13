@@ -62,10 +62,7 @@ class GenerateCommand extends Command implements Isolatable
             $path = $this->resolvePath($this->option('output') ?: $this->config['output']);
 
             $this->ensureDirectory($path);
-            $json = json_encode(
-                $this->sanitizeUtf8($spec),
-                JSON_THROW_ON_ERROR | JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE
-            );
+            $json = json_encode($spec, JSON_THROW_ON_ERROR | JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE);
 
             if (file_put_contents($path, $json) === false) {
                 $this->error("Failed to write: {$path}");
@@ -884,29 +881,5 @@ class GenerateCommand extends Command implements Isolatable
     {
         return $this->reflectionCache[$class]
             ??= new ReflectionClass($class);
-    }
-
-    /**
-     * Recursively sanitize data to valid UTF-8.
-     */
-    private function sanitizeUtf8(mixed $data): mixed
-    {
-        if (is_string($data)) {
-            if (! mb_check_encoding($data, 'UTF-8')) {
-                $data = mb_convert_encoding($data, 'UTF-8');
-            }
-
-            if (class_exists(\Normalizer::class)) {
-                return \Normalizer::normalize($data, \Normalizer::FORM_C);
-            }
-
-            return $data;
-        }
-
-        if (is_array($data)) {
-            return array_map($this->sanitizeUtf8(...), $data);
-        }
-
-        return $data;
     }
 }
