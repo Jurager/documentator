@@ -2,7 +2,7 @@
 
 namespace Jurager\Documentator\Formats;
 
-interface ResponseFormat
+interface AbstractFormatInterface
 {
     /**
      * Get format name identifier.
@@ -33,9 +33,9 @@ interface ResponseFormat
      *
      * @param  string  $method  HTTP method (get, post, put, patch, delete)
      * @param  string  $resource  Resource name (e.g., 'users', 'posts')
-     * @param  array<string, mixed>|null  $attributes  Request body attributes for response examples
+     * @param  array<string, mixed>|null  $responseData  Response data with attributes and relationships
      * @param  bool  $isCollection  Whether this is a collection endpoint
      * @return array<string, mixed>
      */
-    public function operationResponse(string $method, string $resource, ?array $attributes = null, bool $isCollection = false): array;
+    public function operationResponse(string $method, string $resource, ?array $responseData = null, bool $isCollection = false): array;
 }

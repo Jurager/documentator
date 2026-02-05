@@ -2,15 +2,15 @@
 
 namespace Jurager\Documentator\Formats;
 
-use Jurager\Documentator\Support\ExampleGenerator;
+use Jurager\Documentator\Builders\SchemaBuilder;
 
-abstract class AbstractFormat implements ResponseFormat
+abstract class AbstractFormat implements AbstractFormatInterface
 {
-    protected ExampleGenerator $examples;
+    protected SchemaBuilder $examples;
 
-    public function __construct()
+    public function __construct(?SchemaBuilder $examples = null)
     {
-        $this->examples = new ExampleGenerator;
+        $this->examples = $examples ?? new SchemaBuilder();
     }
 
     abstract public function name(): string;
@@ -39,10 +39,7 @@ abstract class AbstractFormat implements ResponseFormat
         ];
     }
 
-    /**
-     * Build operation response - override in child classes for format-specific responses.
-     */
-    public function operationResponse(string $method, string $resource, ?array $attributes = null, bool $isCollection = false): array
+    public function operationResponse(string $method, string $resource, ?array $responseData = null, bool $isCollection = false): array
     {
         $status = match ($method) {
             'post' => '201',
@@ -66,5 +63,28 @@ abstract class AbstractFormat implements ResponseFormat
             'description' => $description,
             'content' => ['application/json' => ['schema' => $schema]],
         ];
+    }
+
+    /**
+     * Get attributes from responseData or return defaults.
+     */
+    protected function getAttributes(?array $responseData): array
+    {
+        if ($responseData && ! empty($responseData['attributes'])) {
+            return $responseData['attributes'];
+        }
+
+        return [
+            'created_at' => ['type' => 'string'],
+            'updated_at' => ['type' => 'string'],
+        ];
+    }
+
+    /**
+     * Get relationships from responseData.
+     */
+    protected function getRelationships(?array $responseData): array
+    {
+        return $responseData['relationships'] ?? [];
     }
 }

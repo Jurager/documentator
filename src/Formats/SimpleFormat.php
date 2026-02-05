@@ -59,7 +59,7 @@ class SimpleFormat extends AbstractFormat
         ];
     }
 
-    public function operationResponse(string $method, string $resource, ?array $attributes = null, bool $isCollection = false): array
+    public function operationResponse(string $method, string $resource, ?array $responseData = null, bool $isCollection = false): array
     {
         $status = match ($method) {
             'post' => '201',
@@ -70,6 +70,8 @@ class SimpleFormat extends AbstractFormat
         if ($status === '204') {
             return [$status => ['description' => 'No Content']];
         }
+
+        $attributes = $this->getAttributes($responseData);
 
         $schema = [
             'type' => 'object',
@@ -83,14 +85,14 @@ class SimpleFormat extends AbstractFormat
                 'type' => 'array',
                 'items' => ['type' => 'object'],
                 'example' => [
-                    $this->examples->object($attributes, '1'),
-                    $this->examples->object($attributes, '2'),
+                    $this->examples->generateObject($attributes),
+                    $this->examples->generateObject($attributes, 2),
                 ],
             ];
             $schema['properties']['meta'] = [
                 'type' => 'object',
                 'example' => [
-                    'total' => $this->examples->faker()->numberBetween(50, 500),
+                    'total' => $this->examples->randomInt(50, 500),
                     'page' => 1,
                     'per_page' => 15,
                 ],
@@ -98,7 +100,7 @@ class SimpleFormat extends AbstractFormat
         } else {
             $schema['properties']['data'] = [
                 'type' => 'object',
-                'example' => $this->examples->object($attributes),
+                'example' => $this->examples->generateObject($attributes),
             ];
         }
 

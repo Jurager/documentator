@@ -95,7 +95,7 @@ class JsonApiFormat extends AbstractFormat
         ];
     }
 
-    public function operationResponse(string $method, string $resource, ?array $attributes = null, bool $isCollection = false): array
+    public function operationResponse(string $method, string $resource, ?array $responseData = null, bool $isCollection = false): array
     {
         $status = match ($method) {
             'post' => '201',
@@ -107,6 +107,9 @@ class JsonApiFormat extends AbstractFormat
             return [$status => ['description' => 'No Content']];
         }
 
+        $attributes = $this->getAttributes($responseData);
+        $relationships = $this->getRelationships($responseData);
+
         return [$status => [
             'description' => match ($status) {
                 '201' => 'Resource created',
@@ -114,20 +117,17 @@ class JsonApiFormat extends AbstractFormat
             },
             'content' => [
                 'application/vnd.api+json' => [
-                    'schema' => $this->buildResponseSchema($resource, $attributes, $isCollection),
+                    'schema' => $this->buildResponseSchema($resource, $attributes, $relationships, $isCollection),
                 ],
             ],
         ]];
     }
 
-    private function buildResponseSchema(string $resource, ?array $attributes, bool $isCollection): array
+    private function buildResponseSchema(string $resource, array $attributes, array $relationships, bool $isCollection): array
     {
-        $resourceSchema = $this->buildResourceSchema($resource, $attributes);
+        $resourceSchema = $this->buildResourceSchema($resource, $attributes, $relationships);
 
         if ($isCollection) {
-            $total = $this->examples->faker()->numberBetween(50, 500);
-            $lastPage = (int) ceil($total / 15);
-
             return [
                 'type' => 'object',
                 'required' => ['data'],
@@ -139,23 +139,23 @@ class JsonApiFormat extends AbstractFormat
                     'links' => [
                         'type' => 'object',
                         'properties' => [
-                            'self' => ['type' => 'string', 'example' => "/{$resource}?page[number]=1"],
-                            'first' => ['type' => 'string', 'example' => "/{$resource}?page[number]=1"],
-                            'last' => ['type' => 'string', 'example' => "/{$resource}?page[number]={$lastPage}"],
-                            'prev' => ['type' => 'string', 'nullable' => true, 'example' => null],
-                            'next' => ['type' => 'string', 'nullable' => true, 'example' => "/{$resource}?page[number]=2"],
+                            'self' => ['type' => 'string'],
+                            'first' => ['type' => 'string'],
+                            'last' => ['type' => 'string'],
+                            'prev' => ['type' => 'string', 'nullable' => true],
+                            'next' => ['type' => 'string', 'nullable' => true],
                         ],
                     ],
                     'meta' => [
                         'type' => 'object',
                         'properties' => [
-                            'total' => ['type' => 'integer', 'example' => $total],
-                            'page' => ['type' => 'integer', 'example' => 1],
-                            'per_page' => ['type' => 'integer', 'example' => 15],
+                            'total' => ['type' => 'integer'],
+                            'page' => ['type' => 'integer'],
+                            'per_page' => ['type' => 'integer'],
                         ],
                     ],
                 ],
-                'example' => $this->buildCollectionExample($resource, $attributes, $total, $lastPage),
+                'example' => $this->buildCollectionExample($resource, $attributes, $relationships),
             ];
         }
 
@@ -166,70 +166,133 @@ class JsonApiFormat extends AbstractFormat
                 'data' => $resourceSchema,
             ],
             'example' => [
-                'data' => $this->examples->jsonApiResource($resource, $attributes),
+                'data' => $this->buildResourceExample($resource, $attributes, $relationships, 1),
             ],
         ];
     }
 
-    private function buildResourceSchema(string $resource, ?array $attributes): array
+    private function buildResourceSchema(string $resource, array $attributes, array $relationships): array
     {
+        // Build attributes properties
+        $attrProps = [];
+        foreach ($attributes as $name => $config) {
+            if ($name === 'id') {
+                continue;
+            }
+            $attrProps[$name] = ['type' => $config['type'] ?? 'string'];
+        }
+
         $schema = [
             'type' => 'object',
             'required' => ['type', 'id'],
             'properties' => [
                 'type' => ['type' => 'string', 'example' => $resource],
                 'id' => ['type' => 'string', 'example' => '1'],
+                'attributes' => [
+                    'type' => 'object',
+                    'properties' => $attrProps ?: null,
+                ],
+                'links' => [
+                    'type' => 'object',
+                    'properties' => [
+                        'self' => ['type' => 'string', 'example' => "/$resource/1"],
+                    ],
+                ],
             ],
         ];
 
-        if ($attributes) {
-            $attrProps = [];
-            foreach ($attributes as $name => $config) {
-                $attrProps[$name] = [
-                    'type' => $config['type'] ?? 'string',
+        // Add relationships if present
+        if (! empty($relationships)) {
+            $relProps = [];
+            foreach ($relationships as $name => $rel) {
+                $relProps[$name] = [
+                    'type' => 'object',
+                    'properties' => [
+                        'data' => $rel['collection']
+                            ? ['type' => 'array', 'items' => $this->buildRelationshipLinkage($rel['type'])]
+                            : $this->buildRelationshipLinkage($rel['type']),
+                        'links' => [
+                            'type' => 'object',
+                            'properties' => [
+                                'related' => ['type' => 'string'],
+                            ],
+                        ],
+                    ],
                 ];
-                if (isset($config['description'])) {
-                    $attrProps[$name]['description'] = $config['description'];
-                }
             }
 
-            $schema['properties']['attributes'] = [
+            $schema['properties']['relationships'] = [
                 'type' => 'object',
-                'properties' => $attrProps,
-            ];
-        } else {
-            $schema['properties']['attributes'] = [
-                'type' => 'object',
-                'additionalProperties' => true,
+                'properties' => $relProps,
             ];
         }
 
-        $schema['properties']['links'] = [
-            'type' => 'object',
-            'properties' => [
-                'self' => ['type' => 'string', 'example' => "/{$resource}/1"],
-            ],
-        ];
-
-        return $schema;
+        return array_filter($schema, fn ($v) => $v !== null);
     }
 
-    private function buildCollectionExample(string $resource, ?array $attributes, int $total, int $lastPage): array
+    private function buildRelationshipLinkage(string $type): array
+    {
+        return [
+            'type' => 'object',
+            'required' => ['type', 'id'],
+            'properties' => [
+                'type' => ['type' => 'string', 'example' => $type],
+                'id' => ['type' => 'string', 'example' => '1'],
+            ],
+        ];
+    }
+
+    private function buildResourceExample(string $resource, array $attributes, array $relationships, int $id): array
+    {
+        $example = $this->examples->generateJsonApiResource($resource, $attributes, $id);
+
+        // Add relationships to example
+        if (! empty($relationships)) {
+            $example['relationships'] = [];
+
+            foreach ($relationships as $name => $rel) {
+                $relType = $rel['type'];
+
+                if ($rel['collection']) {
+                    $example['relationships'][$name] = [
+                        'data' => [
+                            ['type' => $relType, 'id' => '1'],
+                            ['type' => $relType, 'id' => '2'],
+                        ],
+                        'links' => [
+                            'related' => "/$resource/$id/$name",
+                        ],
+                    ];
+                } else {
+                    $example['relationships'][$name] = [
+                        'data' => ['type' => $relType, 'id' => '1'],
+                        'links' => [
+                            'related' => "/$resource/$id/$name",
+                        ],
+                    ];
+                }
+            }
+        }
+
+        return $example;
+    }
+
+    private function buildCollectionExample(string $resource, array $attributes, array $relationships): array
     {
         return [
             'data' => [
-                $this->examples->jsonApiResource($resource, $attributes, '1'),
-                $this->examples->jsonApiResource($resource, $attributes, '2'),
+                $this->buildResourceExample($resource, $attributes, $relationships, 1),
+                $this->buildResourceExample($resource, $attributes, $relationships, 2),
             ],
             'links' => [
-                'self' => "/{$resource}?page[number]=1",
-                'first' => "/{$resource}?page[number]=1",
-                'last' => "/{$resource}?page[number]={$lastPage}",
+                'self' => "/$resource?page[number]=1",
+                'first' => "/$resource?page[number]=1",
+                'last' => "/$resource?page[number]=7",
                 'prev' => null,
-                'next' => "/{$resource}?page[number]=2",
+                'next' => "/$resource?page[number]=2",
             ],
             'meta' => [
-                'total' => $total,
+                'total' => 100,
                 'page' => 1,
                 'per_page' => 15,
             ],
