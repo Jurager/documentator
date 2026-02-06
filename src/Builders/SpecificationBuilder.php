@@ -3,6 +3,7 @@
 namespace Jurager\Documentator\Builders;
 
 use Illuminate\Support\Collection;
+use Illuminate\Support\Str;
 use Jurager\Documentator\Collectors\RouteCollector;
 use Jurager\Documentator\Formats\AbstractFormatInterface;
 use Jurager\Documentator\Parsers\DocumentationParser;
@@ -245,12 +246,27 @@ class SpecificationBuilder
             return (array) $doc['tags'];
         }
 
+        // Try to extract from route name first (e.g., "attributes.index" -> "Attributes")
+        if ($name = $route->getName()) {
+            $parts = explode('.', $name);
+            if (count($parts) > 1) {
+                // Use the first part of the route name (resource name)
+                return [Str::headline($parts[0])];
+            }
+        }
+
+        // Fallback to URI segments
         $segments = array_values(array_filter(
             explode('/', $route->uri()),
-            fn ($s) => ! str_starts_with($s, '{')
+            fn ($s) => $s !== '' && ! str_starts_with($s, '{')
         ));
 
-        return $segments ? [ucfirst(end($segments))] : ['General'];
+        if (empty($segments)) {
+            return ['General'];
+        }
+
+        // Use the last non-parameter segment, with proper UTF-8 support
+        return [Str::headline(end($segments))];
     }
 
     /**

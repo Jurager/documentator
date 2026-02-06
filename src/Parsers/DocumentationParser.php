@@ -290,7 +290,7 @@ class DocumentationParser
         return array_values(array_filter(
             array_map(
                 static fn ($l) => ltrim(trim($l), "* \t"),
-                preg_split('/\R/', $doc) ?: []
+                preg_split('/\R/u', $doc) ?: []
             ),
             static fn ($l) => $l !== '' && $l !== '/**' && $l !== '*/'
         ));
@@ -305,7 +305,7 @@ class DocumentationParser
      */
     private function parseSummaryTag(string $line, array &$info): bool
     {
-        if (preg_match('/^@summary\s+(.+)$/i', $line, $m)) {
+        if (preg_match('/^@summary\s+(.+)$/iu', $line, $m)) {
             $info['summary'] = trim($m[1]);
 
             return true;
@@ -323,7 +323,7 @@ class DocumentationParser
      */
     private function parseDescriptionTag(string $line, array &$descriptionLines): bool
     {
-        if (preg_match('/^@description\s*(.*)$/i', $line, $m)) {
+        if (preg_match('/^@description\s*(.*)$/iu', $line, $m)) {
             if ($m[1] !== '') {
                 $descriptionLines[] = trim($m[1]);
             }
@@ -343,7 +343,7 @@ class DocumentationParser
      */
     private function parseGroupTag(string $line, array &$info): bool
     {
-        if (preg_match('/^@group\s+(.+)$/i', $line, $m)) {
+        if (preg_match('/^@group\s+(.+)$/iu', $line, $m)) {
             $info['group'] = trim($m[1]);
 
             return true;
@@ -361,7 +361,7 @@ class DocumentationParser
      */
     private function parseResourceTag(string $line, array &$info): bool
     {
-        if (preg_match('/^@resource\s+(\S+)/i', $line, $m)) {
+        if (preg_match('/^@resource\s+(\S+)/iu', $line, $m)) {
             $info['resource'] = trim($m[1]);
 
             return true;
@@ -421,7 +421,7 @@ class DocumentationParser
      */
     private function parseResponseTag(string $line, array &$info): bool
     {
-        if (preg_match('/^@response(?:\s+(\d+))?\s+(.+)$/i', $line, $m)) {
+        if (preg_match('/^@response(?:\s+(\d+))?\s+(.+)$/iu', $line, $m)) {
             $content = trim($m[2]);
             $decoded = json_decode($content, true);
 
@@ -450,7 +450,7 @@ class DocumentationParser
             'bodyParam' => 'bodyParams',
             'urlParam' => 'urlParams',
         ] as $tag => $key) {
-            if (preg_match("/^@$tag\s+(.+)$/i", $line, $m)) {
+            if (preg_match("/^@$tag\s+(.+)$/iu", $line, $m)) {
                 if ($param = $this->parseParam($m[1])) {
                     $info[$key][] = $param;
                 }
@@ -471,19 +471,20 @@ class DocumentationParser
      */
     private function parseParam(string $text): ?array
     {
-        $parts = preg_split('/\s+/', $text, 4);
+        $parts = preg_split('/\s+/u', $text, 4);
 
         if (empty($parts[0])) {
             return null;
         }
 
+        $hasRequiredFlag = isset($parts[2]) && in_array(strtolower($parts[2]), ['required', 'optional']);
         $required = isset($parts[2]) && strtolower($parts[2]) === 'required';
 
         return [
             'name' => $parts[0],
             'type' => $parts[1] ?? 'string',
             'required' => $required,
-            'description' => trim($required ? ($parts[3] ?? '') : ($parts[2] ?? '')),
+            'description' => trim($hasRequiredFlag ? ($parts[3] ?? '') : ($parts[2] ?? '')),
         ];
     }
 
