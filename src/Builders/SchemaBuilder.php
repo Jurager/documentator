@@ -105,18 +105,43 @@ class SchemaBuilder
     private function buildFieldSchema(string $field, array $rules): array
     {
         $type = $this->resolveType($rules);
-        $schema = ['type' => $type, 'description' => $this->buildDescription($field, $rules)];
+
+        $schema = [
+            'type' => $type,
+            'description' => $this->buildDescription($field, $rules),
+        ];
 
         foreach ($rules as $rule) {
+
+            if (!is_string($rule)) {
+                continue; // игнорируем Closure и объекты Rule
+            }
+
             match (true) {
-                str_starts_with($rule, 'max:') => $schema[$type === 'string' ? 'maxLength' : 'maximum'] = (int) substr($rule, 4),
-                str_starts_with($rule, 'min:') => $schema[$type === 'string' ? 'minLength' : 'minimum'] = (int) substr($rule, 4),
-                str_starts_with($rule, 'in:') => $schema['enum'] = explode(',', substr($rule, 3)),
-                $rule === 'email' => $schema['format'] = 'email',
-                $rule === 'url' => $schema['format'] = 'uri',
-                $rule === 'uuid' => $schema['format'] = 'uuid',
-                $rule === 'date' => $schema['format'] = 'date',
-                $rule === 'nullable' => $schema['nullable'] = true,
+                str_starts_with($rule, 'max:') =>
+                $schema[$type === 'string' ? 'maxLength' : 'maximum'] = (int) substr($rule, 4),
+
+                str_starts_with($rule, 'min:') =>
+                $schema[$type === 'string' ? 'minLength' : 'minimum'] = (int) substr($rule, 4),
+
+                str_starts_with($rule, 'in:') =>
+                $schema['enum'] = explode(',', substr($rule, 3)),
+
+                $rule === 'email' =>
+                $schema['format'] = 'email',
+
+                $rule === 'url' =>
+                $schema['format'] = 'uri',
+
+                $rule === 'uuid' =>
+                $schema['format'] = 'uuid',
+
+                $rule === 'date' =>
+                $schema['format'] = 'date',
+
+                $rule === 'nullable' =>
+                $schema['nullable'] = true,
+
                 default => null,
             };
         }
@@ -147,17 +172,46 @@ class SchemaBuilder
         $desc = [];
 
         foreach ($rules as $rule) {
-            match (true) {
-                str_starts_with($rule, 'max:') => $desc[] = __('documentator::messages.max', ['value' => substr($rule, 4)]),
-                str_starts_with($rule, 'min:') => $desc[] = __('documentator::messages.min', ['value' => substr($rule, 4)]),
-                $rule === 'email' => $desc[] = 'email',
-                str_starts_with($rule, 'unique') => $desc[] = __('documentator::messages.unique'),
-                str_starts_with($rule, 'exists:') => $desc[] = __('documentator::messages.exists'),
-                default => null,
-            };
+
+            // Строковые правила
+            if (is_string($rule)) {
+                match (true) {
+                    str_starts_with($rule, 'max:') =>
+                    $desc[] = __('documentator::messages.max', ['value' => substr($rule, 4)]),
+
+                    str_starts_with($rule, 'min:') =>
+                    $desc[] = __('documentator::messages.min', ['value' => substr($rule, 4)]),
+
+                    $rule === 'email' =>
+                    $desc[] = 'email',
+
+                    str_starts_with($rule, 'unique') =>
+                    $desc[] = __('documentator::messages.unique'),
+
+                    str_starts_with($rule, 'exists:') =>
+                    $desc[] = __('documentator::messages.exists'),
+
+                    default => null,
+                };
+
+                continue;
+            }
+
+            // Объектные правила
+            if ($rule instanceof Unique) {
+                $desc[] = __('documentator::messages.unique');
+                continue;
+            }
+
+            if ($rule instanceof Exists) {
+                $desc[] = __('documentator::messages.exists');
+                continue;
+            }
         }
 
-        return $desc ? Str::headline($field).' ('.implode(', ', $desc).')' : Str::headline($field);
+        return $desc
+            ? Str::headline($field).' ('.implode(', ', $desc).')'
+            : Str::headline($field);
     }
 
     /**
