@@ -60,13 +60,22 @@ return [
             'url' => env('APP_URL', 'http://localhost'),
             'description' => 'Development server',
         ],
+        // Example: Using server variables for flexible base URL in API clients
+        // (Hoppscotch, Insomnia, Postman) that map variables to environments.
         // [
-        //     'url' => 'https://staging.example.com',
-        //     'description' => 'Staging server',
-        // ],
-        // [
-        //     'url' => 'https://api.example.com',
-        //     'description' => 'Production server',
+        //     'url' => '{protocol}://{host}',
+        //     'description' => 'Configurable server',
+        //     'variables' => [
+        //         'protocol' => [
+        //             'default' => 'https',
+        //             'enum' => ['http', 'https'],
+        //             'description' => 'Protocol',
+        //         ],
+        //         'host' => [
+        //             'default' => 'api.example.com',
+        //             'description' => 'API host',
+        //         ],
+        //     ],
         // ],
     ],
 

@@ -135,10 +135,36 @@ class SpecificationBuilder
     {
         $servers = $this->config['servers'] ?? [['url' => config('app.url', 'http://localhost')]];
 
-        return array_map(fn ($s) => array_filter([
-            'url' => rtrim($s['url'], '/'),
-            'description' => $s['description'] ?? null,
-        ]), $servers);
+        return array_map(function ($s) {
+            $server = array_filter([
+                'url' => rtrim($s['url'], '/'),
+                'description' => $s['description'] ?? null,
+            ]);
+
+            if (! empty($s['variables'])) {
+                $server['variables'] = $this->buildServerVariables($s['variables']);
+            }
+
+            return $server;
+        }, $servers);
+    }
+
+    /**
+     * Build server variables section.
+     */
+    private function buildServerVariables(array $variables): array
+    {
+        $result = [];
+
+        foreach ($variables as $name => $variable) {
+            $result[$name] = array_filter([
+                'default' => $variable['default'] ?? '',
+                'description' => $variable['description'] ?? null,
+                'enum' => $variable['enum'] ?? null,
+            ], fn ($v) => $v !== null);
+        }
+
+        return $result;
     }
 
     /**
