@@ -5,143 +5,114 @@
 [![PHP Version Require](https://poser.pugx.org/jurager/documentator/require/php)](https://packagist.org/packages/jurager/documentator)
 [![License](https://poser.pugx.org/jurager/documentator/license)](https://packagist.org/packages/jurager/documentator)
 
-Automatically generate OpenAPI specification from your Laravel routes with intelligent schema extraction and validation.
+Generate OpenAPI from Laravel routes with automatic schema extraction from Form Requests, validation rules, and API Resources.
+
+> [!NOTE]
+> The documentation for this package is currently being written. For now, please refer to this readme for information on the functionality and usage of the package.
 
 
 - [Features](#features)
 - [Requirements](#requirements)
-- [Installation](#installation)
 - [Quick Start](#quick-start)
 - [Usage](#usage)
 - [Configuration](#configuration)
-  - [Basic Setup](#basic-setup)
-  - [Servers](#servers)
-  - [Security](#security)
-  - [Response Formats](#response-formats)
-  - [Route Discovery](#route-discovery)
-  - [Resource Discovery](#resource-discovery)
-  - [Example Generation](#example-generation)
-  - [Type Mapping](#type-mapping)
-  - [Tags & Grouping](#tags--grouping)
-  - [Default Responses](#default-responses)
-  - [Advanced Options](#advanced-options)
-- [Automatic Schema Detection](#automatic-schema-detection)
+- [How Schema Detection Works](#how-schema-detection-works)
 - [PHPDoc Annotations](#phpdoc-annotations)
 - [Custom Response Format](#custom-response-format)
-- [Validation Rules](#validation-rules)
+- [Validation Rules Mapping](#validation-rules-mapping)
 - [Troubleshooting](#troubleshooting)
 - [License](#license)
 
 ## Features
 
-- **Automatic Generation** - Extracts from FormRequests, inline validation, and Resource classes
-- **Multiple Formats** - Built-in REST and JSON:API, plus custom format support
-- **PHPDoc Annotations** - Rich documentation through `@summary`, `@group`, `@response`, etc.
-- **Smart Type Detection** - Intelligent field type resolution from validation rules
-- **Security Schemes** - Bearer tokens, API Keys, OAuth2, OpenID Connect
-- **Realistic Examples** - Powered by FakerPHP for authentic sample data
-- **Fully Configurable** - Extensive customization options
+- Automatic OpenAPI generation from Laravel routes
+- Schema detection from FormRequest, inline validation, and API Resources
+- Built-in formats: REST (`simple`) and JSON:API (`json-api`)
+- PHPDoc-driven docs: `@summary`, `@group`, `@response`, etc.
+- Built-in security schemes support (Bearer, API key, OAuth2, OpenID)
+- Example payload generation via FakerPHP
+- Configurable output and route filtering
 
 ## Requirements
 
-- PHP 8.1 or higher
+- PHP 8.1+
 - Laravel 10.x or 11.x
-- 
-## Installation
+
+## Quick Start
+
+Install the package:
 
 ```bash
 composer require jurager/documentator
 ```
 
-Publish configuration:
+Publish config:
 
 ```bash
 php artisan vendor:publish --tag=documentator-config
 ```
 
-## Quick Start
+Include your API routes in `config/documentator.php`:
 
-1. Install the package:
-   ```bash
-   composer require jurager/documentator
-   ```
+```php
+'routes' => [
+    'include' => ['api/*'],
+],
+```
 
-2. Publish the config file:
-   ```bash
-   php artisan vendor:publish --tag=documentator-config
-   ```
-
-3. Configure your API routes in `config/documentator.php`:
-   ```php
-   'routes' => [
-       'include' => ['api/*'],
-   ],
-   ```
-
-4. Generate documentation:
-   ```bash
-   php artisan docs:generate
-   ```
-
-5. Your OpenAPI specification will be generated at `docs/openapi.json`
-
-You can now import this file into Swagger UI, Postman, Insomnia, or any other OpenAPI-compatible tool.
-
-## Usage
-
-Generate documentation with a single command:
+Generate spec:
 
 ```bash
 php artisan docs:generate
 ```
 
-### Command Options
+Open result file:
+
+`docs/openapi.json`
+
+Import it into Swagger UI, Postman, Insomnia, or any OpenAPI-compatible tool.
+
+## Usage
+
+Basic command:
+
+```bash
+php artisan docs:generate
+```
+
+Options:
 
 ```bash
 # Override output path
 php artisan docs:generate --output=public/api.json
 
-# Override response format
+# Override response envelope format (simple | json-api | custom)
 php artisan docs:generate --format=json-api
 ```
 
 ## Configuration
 
-The package offers extensive configuration options through `config/documentator.php`:
+Main config file: `config/documentator.php`
 
-### Basic Setup
+### 1) API metadata and output
 
 ```php
-// OpenAPI specification version
 'openapi_version' => '3.0.3',
 
-// API information
 'info' => [
     'title' => env('OPENAPI_TITLE', 'API Documentation'),
     'version' => env('OPENAPI_VERSION', '1.0.0'),
     'description' => env('OPENAPI_DESCRIPTION'),
-    'contact' => [
-        'name' => env('OPENAPI_CONTACT_NAME'),
-        'email' => env('OPENAPI_CONTACT_EMAIL'),
-        'url' => env('OPENAPI_CONTACT_URL'),
-    ],
-    'license' => [
-        'name' => env('OPENAPI_LICENSE_NAME'),
-        'url' => env('OPENAPI_LICENSE_URL'),
-    ],
 ],
 
-// Output configuration
 'output' => [
     'path' => env('OPENAPI_OUTPUT', 'docs/openapi.json'),
-    'format' => 'json', // json or yaml
-    'pretty_print' => true,
+    'format' => env('OPENAPI_OUTPUT_FORMAT', 'json'), // json | yaml
+    'pretty_print' => env('OPENAPI_PRETTY_PRINT', true),
 ],
 ```
 
-### Servers
-
-Define multiple server environments:
+### 2) Servers
 
 ```php
 'servers' => [
@@ -150,19 +121,13 @@ Define multiple server environments:
         'description' => 'Development server',
     ],
     [
-        'url' => 'https://staging.example.com',
-        'description' => 'Staging server',
-    ],
-    [
         'url' => 'https://api.example.com',
         'description' => 'Production server',
     ],
 ],
 ```
 
-### Security
-
-Configure authentication schemes:
+### 3) Security
 
 ```php
 'security' => [
@@ -171,66 +136,35 @@ Configure authentication schemes:
             'type' => 'http',
             'scheme' => 'bearer',
             'bearerFormat' => 'JWT',
-            'description' => 'Enter your bearer token',
-        ],
-        'apiKey' => [
-            'type' => 'apiKey',
-            'in' => 'header',
-            'name' => 'X-API-Key',
-        ],
-        'oauth2' => [
-            'type' => 'oauth2',
-            'flows' => [
-                'authorizationCode' => [
-                    'authorizationUrl' => 'https://example.com/oauth/authorize',
-                    'tokenUrl' => 'https://example.com/oauth/token',
-                    'scopes' => [
-                        'read' => 'Read access',
-                        'write' => 'Write access',
-                    ],
-                ],
-            ],
         ],
     ],
-    'default' => ['bearerAuth'], // Applied to all endpoints
+
+    'default' => ['bearerAuth'], // applied to all endpoints
 ],
 ```
 
-### Response Formats
-
-Choose between built-in formats or create custom ones:
-
-```php
-// Built-in: 'simple' (REST) or 'json-api'
-'format' => env('OPENAPI_FORMAT', 'simple'),
-
-// Register custom formats
-'custom_formats' => [
-    'hal' => App\OpenApi\Formats\HalFormat::class,
-],
-```
-
-### Route Discovery
-
-Control which routes are documented:
+### 4) Route discovery
 
 ```php
 'routes' => [
     'include' => ['api/*'],
-    'exclude' => [
-        'sanctum/*',
-        'horizon/*',
-        'telescope/*',
-        '_ignition/*',
-    ],
+    'exclude' => ['sanctum/*', 'horizon/*', 'telescope/*', '_ignition/*'],
     'exclude_middleware' => ['web'],
     'methods' => ['GET', 'POST', 'PUT', 'PATCH', 'DELETE'],
 ],
 ```
 
-### Resource Discovery
+### 5) Response format
 
-Configure where to find API resources:
+```php
+'format' => env('OPENAPI_FORMAT', 'simple'), // simple | json-api
+
+'custom_formats' => [
+    'hal' => App\OpenApi\Formats\HalFormat::class,
+],
+```
+
+### 6) Resources and examples
 
 ```php
 'resources' => [
@@ -240,114 +174,58 @@ Configure where to find API resources:
     ],
     'suffix' => 'Resource',
 ],
-```
 
-### Example Generation
-
-Control automatic example data generation:
-
-```php
 'examples' => [
     'enabled' => true,
-    'locale' => 'en_US', // FakerPHP locale
-    'seed' => null, // For reproducible examples
+    'locale' => env('FAKER_LOCALE', 'en_US'),
+    'seed' => null,
     'collection_size' => 2,
-    'pagination' => [
-        'total' => 100,
-        'per_page' => 15,
-        'current_page' => 1,
-    ],
 ],
 ```
 
-### Type Mapping
-
-Map validation rules to OpenAPI types:
-
-```php
-'type_map' => [
-    'integer' => 'integer',
-    'numeric' => 'integer',
-    'boolean' => 'boolean',
-    'string' => 'string',
-    'email' => 'string',
-    'url' => 'string',
-    'uuid' => 'string',
-    'date' => 'string',
-    'datetime' => 'string',
-    'array' => 'array',
-    'json' => 'object',
-    'file' => 'string',
-    'image' => 'string',
-],
-```
-
-### Tags & Grouping
-
-Organize endpoints into logical groups:
+### 7) Tags and default responses
 
 ```php
 'tags' => [
-    'auto_generate' => true, // Auto-generate from route prefixes
+    'auto_generate' => true,
     'definitions' => [
         'Users' => 'User management and profiles',
         'Auth' => 'Authentication endpoints',
-        'Posts' => 'Blog posts and content',
     ],
-    'sort' => true, // Alphabetically sort tags
+    'sort' => true,
 ],
-```
 
-### Default Responses
-
-Add reusable responses to all endpoints:
-
-```php
 'responses' => [
     'default' => [
         '401' => ['$ref' => '#/components/responses/Unauthorized'],
         '403' => ['$ref' => '#/components/responses/Forbidden'],
-        '500' => ['$ref' => '#/components/responses/ServerError'],
-    ],
-    'descriptions' => [
-        200 => 'Successful response',
-        201 => 'Resource created successfully',
-        204 => 'Resource deleted successfully',
-        400 => 'Bad request - Invalid input',
-        401 => 'Unauthorized - Authentication required',
-        403 => 'Forbidden - Insufficient permissions',
-        404 => 'Resource not found',
-        422 => 'Validation error',
-        429 => 'Too many requests',
-        500 => 'Internal server error',
     ],
 ],
 ```
 
-### Advanced Options
+### 8) Advanced options
 
 ```php
 'advanced' => [
     'cache_parsed_files' => true,
     'include_deprecated' => false,
-    'validate_schemas' => true,
+    'validate_schemas' => env('OPENAPI_VALIDATE', true),
     'deep_scan_controllers' => true,
 ],
 ```
 
-## Automatic Schema Detection
+## How Schema Detection Works
 
-The package intelligently detects response schemas from your Laravel application:
+Documentator builds request/response schemas from:
 
-### API Resources
+1. FormRequest `rules()`
+2. Inline validation (`$request->validate([...])`)
+3. Controller validation (`validate(...)`)
+4. API Resources (`JsonResource`)
 
-Automatically discovers and parses Laravel API Resource classes:
+Example:
 
 ```php
-namespace App\Http\Resources;
-
-use Illuminate\Http\Resources\Json\JsonResource;
-
 class UserResource extends JsonResource
 {
     public function toArray($request)
@@ -357,43 +235,18 @@ class UserResource extends JsonResource
             'name' => $this->name,
             'email' => $this->email,
             'created_at' => $this->created_at,
-            'updated_at' => $this->updated_at,
         ];
     }
 }
 ```
 
-The package will automatically detect this resource and generate appropriate schemas with realistic example data using FakerPHP.
-
-### Resource Relationships
-
-JSON:API relationships are automatically detected:
-
-```php
-public function toArray($request)
-{
-    return [
-        'id' => $this->id,
-        'attributes' => [
-            'title' => $this->title,
-            'content' => $this->content,
-        ],
-        'relationships' => [
-            'author' => new UserResource($this->author),
-            'comments' => CommentResource::collection($this->comments),
-        ],
-    ];
-}
-```
-
 ## PHPDoc Annotations
+
+Example:
 
 ```php
 /**
- * Get list of users
- *
- * Detailed description goes here.
- * Can be multiline.
+ * Get users
  *
  * @group Users
  * @queryParam page integer Page number
@@ -403,45 +256,27 @@ public function toArray($request)
 public function index()
 {
 }
-
-/**
- * Create user
- *
- * @group Users
- * @bodyParam name string required User name
- * @bodyParam email string required Email address
- * @response 201 {"data": {"id": 1}}
- */
-public function store(StoreUserRequest $request)
-{
-}
-
-/**
- * @deprecated
- * @unauthenticated
- */
-public function legacyEndpoint()
-{
-}
 ```
 
-### Available Annotations
+Supported annotations:
 
-| Annotation | Description |
-|------------|-------------|
-| `@summary text` | Short description |
-| `@description text` | Detailed description |
+| Annotation | Purpose |
+|---|---|
+| `@summary text` | Short endpoint summary |
+| `@description text` | Detailed endpoint description |
 | `@group Name` | Tag/group name |
-| `@resource name` | Override resource name |
+| `@resource name` | Override detected resource name |
 | `@queryParam name type [required] desc` | Query parameter |
 | `@bodyParam name type [required] desc` | Body parameter |
 | `@urlParam name type [required] desc` | URL/path parameter |
 | `@response status {"json"}` | Response example |
-| `@deprecated` | Mark as deprecated |
+| `@deprecated` | Mark endpoint as deprecated |
 | `@authenticated` | Requires authentication |
-| `@unauthenticated` | Public endpoint (no auth) |
+| `@unauthenticated` | Public endpoint |
 
 ## Custom Response Format
+
+Create a class extending `Jurager\Documentator\Formats\AbstractFormat`:
 
 ```php
 namespace App\Documentator;
@@ -495,7 +330,7 @@ class TelegramFormat extends AbstractFormat
 }
 ```
 
-Register in config:
+Register it in config:
 
 ```php
 'custom_formats' => [
@@ -504,70 +339,56 @@ Register in config:
 'format' => 'telegram',
 ```
 
-## Validation Rules
+## Validation Rules Mapping
 
-The package automatically extracts validation rules from:
-
-1. **FormRequest classes** - `rules()` method
-2. **Inline validation** - `$request->validate([...])`
-3. **Controller method** - `validate()` calls
-
-### Supported Rules → OpenAPI Mapping
-
-| Laravel Rule | OpenAPI Type | Format/Additional |
-|--------------|--------------|-------------------|
-| `integer`, `int`, `numeric` | `integer` | - |
-| `boolean`, `bool` | `boolean` | - |
-| `string` | `string` | - |
-| `email` | `string` | `format: email` |
-| `url` | `string` | `format: uri` |
-| `uuid` | `string` | `format: uuid` |
-| `date` | `string` | `format: date` |
-| `datetime` | `string` | `format: date-time` |
-| `array` | `array` | - |
-| `json` | `object` | - |
-| `file`, `image` | `string` | `format: binary` |
-| `min:N` | - | `minLength`/`minimum` |
-| `max:N` | - | `maxLength`/`maximum` |
-| `in:a,b,c` | - | `enum: [a, b, c]` |
-| `required` | - | `required: true` |
-| `nullable` | - | `nullable: true` |
+| Laravel Rule | OpenAPI |
+|---|---|
+| `integer`, `int`, `numeric` | `type: integer` |
+| `boolean`, `bool` | `type: boolean` |
+| `string` | `type: string` |
+| `email` | `type: string`, `format: email` |
+| `url` | `type: string`, `format: uri` |
+| `uuid` | `type: string`, `format: uuid` |
+| `date` | `type: string`, `format: date` |
+| `datetime` | `type: string`, `format: date-time` |
+| `array` | `type: array` |
+| `json` | `type: object` |
+| `file`, `image` | `type: string`, `format: binary` |
+| `min:N` | `minLength` or `minimum` |
+| `max:N` | `maxLength` or `maximum` |
+| `in:a,b,c` | `enum: [a, b, c]` |
+| `required` | required field |
+| `nullable` | nullable field |
 
 ## Troubleshooting
 
 ### No routes found
 
-If you see "No routes were found matching your configuration":
+If generator says no routes were found:
 
-1. Check your `routes.include` patterns in `config/documentator.php`
-2. Verify routes are registered (run `php artisan route:list`)
-3. Ensure routes aren't excluded by `routes.exclude` patterns
-4. Check `routes.methods` includes the HTTP methods you're using
+1. Verify `routes.include` in `config/documentator.php`.
+2. Check routes are registered: `php artisan route:list`.
+3. Ensure route patterns are not excluded by `routes.exclude`.
+4. Verify methods are allowed in `routes.methods`.
 
-### Empty paths in generated spec
+### Empty `paths` in generated spec
 
-If routes are found but no endpoints are generated:
-
-1. Verify your controllers are accessible and not throwing errors
-2. Check that route actions are defined (not closures)
-3. Ensure controller methods exist
+1. Ensure controller classes and methods exist.
+2. Avoid closure routes for endpoints you want documented.
+3. Check controller loading errors in your app.
 
 ### Custom format not found
 
-When using a custom format:
-
-1. Register it in `custom_formats` config (not `formats`)
-2. Ensure the class exists and extends `AbstractFormat`
-3. Check the namespace is correct
+1. Register class in `custom_formats` (not `formats`).
+2. Ensure class extends `AbstractFormat`.
+3. Verify namespace/class name is correct.
 
 ### Resource class not detected
 
-If your API Resource classes aren't being detected:
-
-1. Add the namespace to `resources.namespaces` in config
-2. Ensure classes extend `Illuminate\Http\Resources\Json\JsonResource`
-3. Check the resource naming convention matches `resources.suffix`
+1. Add namespace to `resources.namespaces`.
+2. Ensure class extends `JsonResource`.
+3. Check class suffix matches `resources.suffix`.
 
 ## License
 
-MIT License - see [LICENSE](LICENSE) for details.
+This package is open-sourced software licensed under the [MIT license](LICENSE.md).
