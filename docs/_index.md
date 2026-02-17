@@ -1,5 +1,5 @@
 ---
-title: Documentation
+title: Documentator
 weight: 1
 ---
 
