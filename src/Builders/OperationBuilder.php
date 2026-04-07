@@ -43,7 +43,7 @@ class OperationBuilder
 
         // Generate request body
         $requestBody = null;
-        if (in_array($method, ['post', 'put', 'patch'])) {
+        if (in_array($method, ['post', 'put', 'patch', 'delete'])) {
             $result = $this->buildRequestBody($route, $method, $doc['validation'] ?? [], $doc, $segments);
             $requestBody = $result['body'];
 
@@ -104,22 +104,20 @@ class OperationBuilder
             ];
         }
 
-        // Query parameters (only for GET requests)
-        if ($method === 'get') {
-            foreach ($doc['queryParams'] ?? [] as $p) {
-                // Convert dot notation to array notation: filter.name -> filter[name]
-                $name = str_contains($p['name'], '.')
-                    ? explode('.', $p['name'])[0].'['.implode('][', array_slice(explode('.', $p['name']), 1)).']'
-                    : $p['name'];
+        // Query parameters
+        foreach ($doc['queryParams'] ?? [] as $p) {
+            // Convert dot notation to array notation: filter.name -> filter[name]
+            $name = str_contains($p['name'], '.')
+                ? explode('.', $p['name'])[0].'['.implode('][', array_slice(explode('.', $p['name']), 1)).']'
+                : $p['name'];
 
-                $params[] = [
-                    'name' => $name,
-                    'in' => 'query',
-                    'required' => $p['required'],
-                    'schema' => ['type' => $this->normalizeType($p['type'])],
-                    'description' => $p['description'],
-                ];
-            }
+            $params[] = [
+                'name' => $name,
+                'in' => 'query',
+                'required' => $p['required'],
+                'schema' => ['type' => $this->normalizeType($p['type'])],
+                'description' => $p['description'],
+            ];
         }
 
         return $params;
