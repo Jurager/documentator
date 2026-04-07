@@ -100,7 +100,7 @@ class OperationBuilder
                 'in' => 'path',
                 'required' => $urlParam['required'] ?? true,
                 'schema' => ['type' => $this->normalizeType($urlParam['type'] ?? 'string')],
-                'description' => $urlParam['description'] ?? __('documentator::messages.id_of', ['name' => Str::headline($name)]),
+                'description' => $urlParam['description'] ?? __('documentator::documentator.id_of', ['name' => Str::headline($name)]),
             ];
         }
 

@@ -68,7 +68,7 @@ class SchemaBuilder
             $props[$field] = $this->buildFieldSchema($field, $ruleList);
         }
 
-        // Add body params from doc comments
+        // Merge body params from doc comments: override description, fill missing fields
         foreach ($docParams as $p) {
             if (str_contains($p['name'], '.')) {
                 [$arrayField, $itemField] = explode('.', $p['name'], 2);
@@ -82,10 +82,21 @@ class SchemaBuilder
                     'description' => $p['description'],
                 ];
             } else {
-                $props[$p['name']] ??= [
-                    'type' => $this->normalizeType($p['type']),
-                    'description' => $p['description'],
-                ];
+                if (isset($props[$p['name']])) {
+                    // Field already built from FormRequest rules — override description and type from docParam
+                    if ($p['description'] !== '') {
+                        $props[$p['name']]['description'] = $p['description'];
+                    }
+                    $docType = $this->normalizeType($p['type']);
+                    if ($docType !== 'string') {
+                        $props[$p['name']]['type'] = $docType;
+                    }
+                } else {
+                    $props[$p['name']] = [
+                        'type' => $this->normalizeType($p['type']),
+                        'description' => $p['description'],
+                    ];
+                }
                 if ($p['required'] && ! in_array($p['name'], $required)) {
                     $required[] = $p['name'];
                 }
@@ -177,19 +188,19 @@ class SchemaBuilder
             if (is_string($rule)) {
                 match (true) {
                     str_starts_with($rule, 'max:') =>
-                    $desc[] = __('documentator::messages.max', ['value' => substr($rule, 4)]),
+                    $desc[] = __('documentator::documentator.max', ['value' => substr($rule, 4)]),
 
                     str_starts_with($rule, 'min:') =>
-                    $desc[] = __('documentator::messages.min', ['value' => substr($rule, 4)]),
+                    $desc[] = __('documentator::documentator.min', ['value' => substr($rule, 4)]),
 
                     $rule === 'email' =>
                     $desc[] = 'email',
 
                     str_starts_with($rule, 'unique') =>
-                    $desc[] = __('documentator::messages.unique'),
+                    $desc[] = __('documentator::documentator.unique'),
 
                     str_starts_with($rule, 'exists:') =>
-                    $desc[] = __('documentator::messages.exists'),
+                    $desc[] = __('documentator::documentator.exists'),
 
                     default => null,
                 };
@@ -199,12 +210,12 @@ class SchemaBuilder
 
             // Объектные правила
             if ($rule instanceof Unique) {
-                $desc[] = __('documentator::messages.unique');
+                $desc[] = __('documentator::documentator.unique');
                 continue;
             }
 
             if ($rule instanceof Exists) {
-                $desc[] = __('documentator::messages.exists');
+                $desc[] = __('documentator::documentator.exists');
                 continue;
             }
         }
@@ -219,11 +230,15 @@ class SchemaBuilder
      */
     private function normalizeType(string $type): string
     {
-        return match (strtolower($type)) {
+        $base = strtolower(rtrim($type, '[]'));
+
+        return match ($base) {
             'int', 'integer', 'numeric' => 'integer',
             'float', 'double', 'number' => 'number',
             'bool', 'boolean' => 'boolean',
-            default => 'string',
+            'array' => 'array',
+            'object' => 'object',
+            default => str_ends_with($type, '[]') ? 'array' : 'string',
         };
     }
 
