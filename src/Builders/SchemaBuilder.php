@@ -103,10 +103,13 @@ class SchemaBuilder
             }
         }
 
+        $example = $this->buildExample($props);
+
         return array_filter([
             'type' => 'object',
             'properties' => $props,
             'required' => $required ?: null,
+            'example' => $example ?: null,
         ]);
     }
 
@@ -240,6 +243,29 @@ class SchemaBuilder
             'object' => 'object',
             default => str_ends_with($type, '[]') ? 'array' : 'string',
         };
+    }
+
+    /**
+     * Build example object from schema properties.
+     */
+    private function buildExample(array $props): array
+    {
+        $example = [];
+
+        foreach ($props as $name => $prop) {
+            $type = $prop['type'] ?? 'string';
+
+            if ($type === 'array') {
+                $itemProps = $prop['items']['properties'] ?? null;
+                $example[$name] = $itemProps
+                    ? [$this->buildExample($itemProps)]
+                    : [$this->generateValue($name, 'string')];
+            } else {
+                $example[$name] = $this->generateValue($name, $type);
+            }
+        }
+
+        return $example;
     }
 
     /**
