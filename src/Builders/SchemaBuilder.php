@@ -56,6 +56,22 @@ class SchemaBuilder
                 continue;
             }
 
+            // Handle scalar array items: field.* (array of strings/files/numbers).
+            // The pattern declares the item shape directly, not a nested property.
+            if (str_ends_with($field, '.*')) {
+                $arrayField = substr($field, 0, -2);
+                $itemSchema = $this->buildFieldSchema($arrayField, $ruleList);
+                unset($itemSchema['description']);
+
+                $props[$arrayField] ??= [
+                    'type' => 'array',
+                    'description' => Str::headline($arrayField),
+                ];
+                $props[$arrayField]['items'] = $itemSchema;
+
+                continue;
+            }
+
             // Skip nested fields
             if (str_contains($field, '.')) {
                 continue;
@@ -72,6 +88,26 @@ class SchemaBuilder
         foreach ($docParams as $p) {
             if (str_contains($p['name'], '.')) {
                 [$arrayField, $itemField] = explode('.', $p['name'], 2);
+                $isFileType = strtolower(rtrim($p['type'], '[]')) === 'file';
+
+                // `field.*` declares the scalar item shape of an array field
+                if ($itemField === '*') {
+                    $props[$arrayField] ??= [
+                        'type' => 'array',
+                        'description' => Str::headline($arrayField),
+                    ];
+                    $itemSchema = ['type' => $this->normalizeType($p['type'])];
+                    if ($isFileType) {
+                        $itemSchema['format'] = 'binary';
+                    }
+                    if (! empty($p['description'])) {
+                        $itemSchema['description'] = $p['description'];
+                    }
+                    $props[$arrayField]['items'] = $itemSchema;
+
+                    continue;
+                }
+
                 $props[$arrayField] ??= [
                     'type' => 'array',
                     'description' => Str::headline($arrayField),
@@ -81,7 +117,12 @@ class SchemaBuilder
                     'type' => $this->normalizeType($p['type']),
                     'description' => $p['description'],
                 ];
+                if ($isFileType) {
+                    $props[$arrayField]['items']['properties'][$itemField]['format'] = 'binary';
+                }
             } else {
+                $isFileType = strtolower(rtrim($p['type'], '[]')) === 'file';
+
                 if (isset($props[$p['name']])) {
                     // Field already built from FormRequest rules — override description and type from docParam
                     if ($p['description'] !== '') {
@@ -91,11 +132,17 @@ class SchemaBuilder
                     if ($docType !== 'string') {
                         $props[$p['name']]['type'] = $docType;
                     }
+                    if ($isFileType) {
+                        $props[$p['name']]['format'] = 'binary';
+                    }
                 } else {
                     $props[$p['name']] = [
                         'type' => $this->normalizeType($p['type']),
                         'description' => $p['description'],
                     ];
+                    if ($isFileType) {
+                        $props[$p['name']]['format'] = 'binary';
+                    }
                 }
                 if ($p['required'] && ! in_array($p['name'], $required)) {
                     $required[] = $p['name'];
@@ -152,6 +199,9 @@ class SchemaBuilder
 
                 $rule === 'date' =>
                 $schema['format'] = 'date',
+
+                $rule === 'file', $rule === 'image' =>
+                $schema['format'] = 'binary',
 
                 $rule === 'nullable' =>
                 $schema['nullable'] = true,

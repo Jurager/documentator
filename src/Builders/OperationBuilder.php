@@ -154,17 +154,40 @@ class OperationBuilder
         $operationId = $this->generateOperationIdForSchema($route, $method, $segments);
         $schemaName = Str::studly("{$resource}_{$operationId}_Request");
 
+        // Switch content type to multipart/form-data when the schema contains
+        // a binary-formatted property (file upload). JSON cannot carry raw bytes.
+        $contentType = $this->hasBinaryProperty($schema) ? 'multipart/form-data' : 'application/json';
+
         return [
             'body' => [
                 'required' => true,
                 'content' => [
-                    'application/json' => [
+                    $contentType => [
                         'schema' => ['$ref' => "#/components/schemas/$schemaName"],
                     ],
                 ],
             ],
             'schema' => [$schemaName => $schema],
         ];
+    }
+
+    /**
+     * Detect whether the schema contains a property declared as binary (file upload),
+     * including arrays of binary items. Used to pick multipart over JSON content-type.
+     */
+    private function hasBinaryProperty(array $schema): bool
+    {
+        foreach ($schema['properties'] ?? [] as $prop) {
+            if (($prop['format'] ?? null) === 'binary') {
+                return true;
+            }
+
+            if (($prop['type'] ?? null) === 'array' && ($prop['items']['format'] ?? null) === 'binary') {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     /**
