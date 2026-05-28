@@ -40,89 +40,29 @@ class SchemaBuilder
             $ruleList = is_array($r) ? $r : explode('|', $r);
             $isRequired = in_array('required', $ruleList);
 
-            // Handle array items: field.*.subfield
-            if (str_contains($field, '.*.')) {
-                [$arrayField, , $itemField] = explode('.', $field, 3);
-                $props[$arrayField] ??= [
-                    'type' => 'array',
-                    'description' => Str::headline($arrayField),
-                    'items' => ['type' => 'object', 'properties' => [], 'required' => []],
-                ];
-                $props[$arrayField]['items']['properties'][$itemField] = $this->buildFieldSchema($itemField, $ruleList);
+            $segments = explode('.', $field);
+            $leafName = end($segments);
+
+            // Top-level scalar
+            if (count($segments) === 1) {
                 if ($isRequired) {
-                    $props[$arrayField]['items']['required'][] = $itemField;
+                    $required[] = $field;
                 }
+                $props[$field] = $this->buildFieldSchema($field, $ruleList);
 
                 continue;
             }
 
-            // Handle scalar array items: field.* (array of strings/files/numbers).
-            // The pattern declares the item shape directly, not a nested property.
-            if (str_ends_with($field, '.*')) {
-                $arrayField = substr($field, 0, -2);
-                $itemSchema = $this->buildFieldSchema($arrayField, $ruleList);
-                unset($itemSchema['description']);
-
-                $props[$arrayField] ??= [
-                    'type' => 'array',
-                    'description' => Str::headline($arrayField),
-                ];
-                $props[$arrayField]['items'] = $itemSchema;
-
-                continue;
-            }
-
-            // Skip nested fields
-            if (str_contains($field, '.')) {
-                continue;
-            }
-
-            if ($isRequired) {
-                $required[] = $field;
-            }
-
-            $props[$field] = $this->buildFieldSchema($field, $ruleList);
+            // Nested / array path
+            $leafSchema = $this->buildFieldSchema($leafName === '*' ? $segments[count($segments) - 2] : $leafName, $ruleList);
+            $this->setNestedSchema($props, $segments, $leafSchema, $isRequired);
         }
 
         // Merge body params from doc comments: override description, fill missing fields
         foreach ($docParams as $p) {
-            if (str_contains($p['name'], '.')) {
-                [$arrayField, $itemField] = explode('.', $p['name'], 2);
-                $isFileType = strtolower(rtrim($p['type'], '[]')) === 'file';
+            $isFileType = strtolower(rtrim($p['type'], '[]')) === 'file';
 
-                // `field.*` declares the scalar item shape of an array field
-                if ($itemField === '*') {
-                    $props[$arrayField] ??= [
-                        'type' => 'array',
-                        'description' => Str::headline($arrayField),
-                    ];
-                    $itemSchema = ['type' => $this->normalizeType($p['type'])];
-                    if ($isFileType) {
-                        $itemSchema['format'] = 'binary';
-                    }
-                    if (! empty($p['description'])) {
-                        $itemSchema['description'] = $p['description'];
-                    }
-                    $props[$arrayField]['items'] = $itemSchema;
-
-                    continue;
-                }
-
-                $props[$arrayField] ??= [
-                    'type' => 'array',
-                    'description' => Str::headline($arrayField),
-                    'items' => ['type' => 'object', 'properties' => []],
-                ];
-                $props[$arrayField]['items']['properties'][$itemField] = [
-                    'type' => $this->normalizeType($p['type']),
-                    'description' => $p['description'],
-                ];
-                if ($isFileType) {
-                    $props[$arrayField]['items']['properties'][$itemField]['format'] = 'binary';
-                }
-            } else {
-                $isFileType = strtolower(rtrim($p['type'], '[]')) === 'file';
-
+            if (! str_contains($p['name'], '.')) {
                 if (isset($props[$p['name']])) {
                     // Field already built from FormRequest rules — override description and type from docParam
                     if ($p['description'] !== '') {
@@ -147,7 +87,20 @@ class SchemaBuilder
                 if ($p['required'] && ! in_array($p['name'], $required)) {
                     $required[] = $p['name'];
                 }
+
+                continue;
             }
+
+            $segments = explode('.', $p['name']);
+            $leafSchema = ['type' => $this->normalizeType($p['type'])];
+            if ($isFileType) {
+                $leafSchema['format'] = 'binary';
+            }
+            if (! empty($p['description'])) {
+                $leafSchema['description'] = $p['description'];
+            }
+
+            $this->setNestedSchema($props, $segments, $leafSchema, (bool) ($p['required'] ?? false));
         }
 
         $example = $this->buildExample($props);
@@ -158,6 +111,69 @@ class SchemaBuilder
             'required' => $required ?: null,
             'example' => $example ?: null,
         ]);
+    }
+
+    /**
+     * Place a leaf schema into a (possibly multi-level) nested array path.
+     *
+     * Segments may include any number of `*` markers which denote array items.
+     * Examples:
+     *   ['regions']                                          → scalar prop
+     *   ['regions', '*']                                     → array of scalars
+     *   ['region_warehouses', '*', 'region_id']              → array of objects with prop
+     *   ['region_warehouses', '*', 'warehouses', '*', 'id']  → array of objects → array of objects with prop
+     */
+    private function setNestedSchema(array &$props, array $segments, array $leafSchema, bool $required = false): void
+    {
+        $field = $segments[0];
+        $rest = array_slice($segments, 1);
+
+        if (count($rest) === 0) {
+            $props[$field] = $leafSchema;
+
+            return;
+        }
+
+        if ($rest[0] === '*') {
+            $props[$field] ??= [
+                'type' => 'array',
+                'description' => Str::headline($field),
+            ];
+            // Ensure declared as array even if previously inferred otherwise
+            $props[$field]['type'] = 'array';
+
+            $afterStar = array_slice($rest, 1);
+
+            if (count($afterStar) === 0) {
+                // Scalar array — leaf schema describes the item itself
+                $itemSchema = $leafSchema;
+                unset($itemSchema['description']);
+                $props[$field]['items'] = $itemSchema;
+
+                return;
+            }
+
+            // Object items
+            if (! isset($props[$field]['items']) || ! isset($props[$field]['items']['properties'])) {
+                $props[$field]['items'] = ['type' => 'object', 'properties' => [], 'required' => []];
+            }
+            $this->setNestedSchema($props[$field]['items']['properties'], $afterStar, $leafSchema, $required);
+
+            if ($required && count($afterStar) === 1) {
+                $props[$field]['items']['required'] ??= [];
+                if (! in_array($afterStar[0], $props[$field]['items']['required'], true)) {
+                    $props[$field]['items']['required'][] = $afterStar[0];
+                }
+            }
+
+            return;
+        }
+
+        // Plain nested object property
+        if (! isset($props[$field]) || ($props[$field]['type'] ?? null) !== 'object') {
+            $props[$field] = ['type' => 'object', 'properties' => [], 'required' => []];
+        }
+        $this->setNestedSchema($props[$field]['properties'], $rest, $leafSchema, $required);
     }
 
     /**
@@ -283,7 +299,11 @@ class SchemaBuilder
      */
     private function normalizeType(string $type): string
     {
-        $base = strtolower(rtrim($type, '[]'));
+        if (str_ends_with($type, '[]')) {
+            return 'array';
+        }
+
+        $base = strtolower($type);
 
         return match ($base) {
             'int', 'integer', 'numeric' => 'integer',
@@ -291,7 +311,7 @@ class SchemaBuilder
             'bool', 'boolean' => 'boolean',
             'array' => 'array',
             'object' => 'object',
-            default => str_ends_with($type, '[]') ? 'array' : 'string',
+            default => 'string',
         };
     }
 
@@ -307,9 +327,14 @@ class SchemaBuilder
 
             if ($type === 'array') {
                 $itemProps = $prop['items']['properties'] ?? null;
-                $example[$name] = $itemProps
-                    ? [$this->buildExample($itemProps)]
-                    : [$this->generateValue($name, 'string')];
+                if ($itemProps) {
+                    $example[$name] = [$this->buildExample($itemProps)];
+                } else {
+                    $itemType = $prop['items']['type'] ?? 'string';
+                    $example[$name] = [$this->generateValue($name, $itemType)];
+                }
+            } elseif ($type === 'object') {
+                $example[$name] = $this->buildExample($prop['properties'] ?? []);
             } else {
                 $example[$name] = $this->generateValue($name, $type);
             }
