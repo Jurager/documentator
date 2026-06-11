@@ -62,36 +62,50 @@ class SchemaBuilder
         foreach ($docParams as $p) {
             $isFileType = strtolower(rtrim($p['type'], '[]')) === 'file';
 
-            if (! str_contains($p['name'], '.')) {
-                if (isset($props[$p['name']])) {
+            // Support Scribe-style array notation in param names (e.g. "attributes[].id"),
+            // converting "[]" markers into the "*" segment understood by setNestedSchema().
+            $segments = $this->parseParamSegments($p['name']);
+
+            if (count($segments) === 1) {
+                $name = $segments[0];
+                $docType = $this->normalizeType($p['type']);
+
+                if (isset($props[$name])) {
                     // Field already built from FormRequest rules — override description and type from docParam
                     if ($p['description'] !== '') {
-                        $props[$p['name']]['description'] = $p['description'];
+                        $props[$name]['description'] = $p['description'];
                     }
-                    $docType = $this->normalizeType($p['type']);
                     if ($docType !== 'string') {
-                        $props[$p['name']]['type'] = $docType;
-                    }
-                    if ($isFileType) {
-                        $props[$p['name']]['format'] = 'binary';
+                        $props[$name]['type'] = $docType;
                     }
                 } else {
-                    $props[$p['name']] = [
-                        'type' => $this->normalizeType($p['type']),
+                    $props[$name] = [
+                        'type' => $docType,
                         'description' => $p['description'],
                     ];
-                    if ($isFileType) {
-                        $props[$p['name']]['format'] = 'binary';
+                }
+
+                if ($isFileType) {
+                    $props[$name]['format'] = 'binary';
+                }
+
+                // Scalar array (e.g. "integer[]"): describe the item type so the example
+                // renders as an array of that scalar instead of a single string. Object
+                // arrays ("object[]") are left for their "[].field" params to populate.
+                if ($docType === 'array' && str_ends_with($p['type'], '[]')) {
+                    $base = $this->normalizeType(rtrim($p['type'], '[]'));
+                    if ($base !== 'object' && ! isset($props[$name]['items'])) {
+                        $props[$name]['items'] = ['type' => $base];
                     }
                 }
-                if ($p['required'] && ! in_array($p['name'], $required)) {
-                    $required[] = $p['name'];
+
+                if (($p['required'] ?? false) && ! in_array($name, $required)) {
+                    $required[] = $name;
                 }
 
                 continue;
             }
 
-            $segments = explode('.', $p['name']);
             $leafSchema = ['type' => $this->normalizeType($p['type'])];
             if ($isFileType) {
                 $leafSchema['format'] = 'binary';
@@ -111,6 +125,39 @@ class SchemaBuilder
             'required' => $required ?: null,
             'example' => $example ?: null,
         ]);
+    }
+
+    /**
+     * Split a doc param name into path segments, expanding Scribe-style array
+     * markers ("[]") into the "*" segment used by setNestedSchema().
+     *
+     * Examples:
+     *   'group_id'              → ['group_id']
+     *   'attributes[]'          → ['attributes', '*']
+     *   'attributes[].id'       → ['attributes', '*', 'id']
+     *   'rows[].cells[].value'  → ['rows', '*', 'cells', '*', 'value']
+     */
+    private function parseParamSegments(string $name): array
+    {
+        $segments = [];
+
+        foreach (explode('.', $name) as $part) {
+            $stars = 0;
+            while (str_ends_with($part, '[]')) {
+                $part = substr($part, 0, -2);
+                $stars++;
+            }
+
+            if ($part !== '') {
+                $segments[] = $part;
+            }
+
+            for ($i = 0; $i < $stars; $i++) {
+                $segments[] = '*';
+            }
+        }
+
+        return $segments;
     }
 
     /**
