@@ -170,8 +170,13 @@ class SchemaBuilder
         }
 
         // Plain nested object property
-        if (! isset($props[$field]) || ($props[$field]['type'] ?? null) !== 'object') {
-            $props[$field] = ['type' => 'object', 'properties' => [], 'required' => []];
+        if (! isset($props[$field]) || ($props[$field]['type'] ?? null) !== 'object' || ! isset($props[$field]['properties']) || ! is_array($props[$field]['properties'])) {
+            $props[$field] = [
+                'type' => 'object',
+                'description' => $props[$field]['description'] ?? Str::headline($field),
+                'properties' => [],
+                'required' => [],
+            ];
         }
         $this->setNestedSchema($props[$field]['properties'], $rest, $leafSchema, $required);
     }
