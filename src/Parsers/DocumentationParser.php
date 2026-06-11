@@ -2,6 +2,7 @@
 
 namespace Jurager\Documentator\Parsers;
 
+use Illuminate\Http\Request;
 use Illuminate\Routing\Route;
 use Illuminate\Support\Str;
 use Jurager\Documentator\Resolvers\FieldTypeResolver;
@@ -522,7 +523,7 @@ class DocumentationParser
                     continue;
                 }
 
-                $request = $requestRef->newInstanceWithoutConstructor();
+                $request = $this->makeFormRequestStub($typeName, $requestRef);
                 $rules = $rulesMethod->invoke($request);
 
                 if (is_array($rules)) {
@@ -534,6 +535,71 @@ class DocumentationParser
         }
 
         return [];
+    }
+
+    /**
+     * Build a usable FormRequest instance for static rules() extraction.
+     *
+     * @param  string  $typeName  FormRequest class name
+     * @param  ReflectionClass  $requestRef  Reflection of the FormRequest class
+     * @return object FormRequest instance
+     */
+    private function makeFormRequestStub(string $typeName, ReflectionClass $requestRef): object
+    {
+        // Stub returned for any route parameter / arbitrary accessor.
+        $stub = new class () {
+            public function __get($name)
+            {
+                return null;
+            }
+
+            public function __isset($name)
+            {
+                return false;
+            }
+
+            public function __call($name, $arguments)
+            {
+                return null;
+            }
+        };
+
+        $routeResolver = static fn () => new class ($stub) {
+            public function __construct(private object $stub)
+            {
+            }
+
+            public function parameter($name, $default = null)
+            {
+                return $this->stub;
+            }
+
+            public function __call($name, $arguments)
+            {
+                return null;
+            }
+        };
+
+        if (method_exists($typeName, 'createFrom')) {
+            /** @var \Illuminate\Foundation\Http\FormRequest $request */
+            $request = $typeName::createFrom(Request::create('/', 'POST'));
+
+            if (function_exists('app') && method_exists($request, 'setContainer')) {
+                $request->setContainer(app());
+            }
+
+            $request->setRouteResolver($routeResolver);
+
+            return $request;
+        }
+
+        $request = $requestRef->newInstanceWithoutConstructor();
+
+        if (method_exists($request, 'setRouteResolver')) {
+            $request->setRouteResolver($routeResolver);
+        }
+
+        return $request;
     }
 
     /**

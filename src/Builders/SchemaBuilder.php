@@ -287,6 +287,10 @@ class SchemaBuilder
     private function resolveType(array $rules): string
     {
         foreach ($rules as $rule) {
+            if (! is_string($rule)) {
+                continue; // skip Closure and Rule objects
+            }
+
             $name = explode(':', $rule)[0];
             if (isset($this->typeMap[$name])) {
                 return $this->typeMap[$name];
