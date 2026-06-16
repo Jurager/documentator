@@ -2,15 +2,15 @@
 
 namespace Jurager\Documentator\Formats;
 
-use Jurager\Documentator\Builders\SchemaBuilder;
+use Jurager\Documentator\Generators\ExampleGenerator;
 
 abstract class AbstractFormat implements AbstractFormatInterface
 {
-    protected SchemaBuilder $examples;
+    protected ExampleGenerator $examples;
 
-    public function __construct(?SchemaBuilder $examples = null)
+    public function __construct(?ExampleGenerator $examples = null)
     {
-        $this->examples = $examples ?? new SchemaBuilder();
+        $this->examples = $examples ?? new ExampleGenerator();
     }
 
     abstract public function name(): string;

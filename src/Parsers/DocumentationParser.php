@@ -6,6 +6,7 @@ use Illuminate\Http\Request;
 use Illuminate\Routing\Route;
 use Illuminate\Support\Str;
 use Jurager\Documentator\Resolvers\FieldTypeResolver;
+use Jurager\Documentator\Support\ResourceAstReader;
 use ReflectionClass;
 use ReflectionMethod;
 use ReflectionNamedType;
@@ -24,11 +25,9 @@ class DocumentationParser
 
     private array $methodCache = [];
 
-    /**
-     * @param  FieldTypeResolver  $typeResolver  Field type resolver for resource attributes
-     */
     public function __construct(
-        private FieldTypeResolver $typeResolver
+        private FieldTypeResolver $typeResolver,
+        private ResourceAstReader $astReader = new ResourceAstReader(),
     ) {
     }
 
@@ -490,11 +489,22 @@ class DocumentationParser
         $hasRequiredFlag = isset($parts[2]) && in_array(strtolower($parts[2]), ['required', 'optional']);
         $required = isset($parts[2]) && strtolower($parts[2]) === 'required';
 
+        $description = trim($hasRequiredFlag ? ($parts[3] ?? '') : ($parts[2] ?? ''));
+
+        // Опциональный явный пример: "... Example: <json|text>" — попадает в пример тела.
+        $example = null;
+        if (preg_match('/^(.*?)\bExample:\s*(.+)$/su', $description, $em)) {
+            $description = trim($em[1]);
+            $decoded = json_decode(trim($em[2]), true);
+            $example = json_last_error() === JSON_ERROR_NONE ? $decoded : trim($em[2]);
+        }
+
         return [
             'name' => $parts[0],
             'type' => $parts[1] ?? 'string',
             'required' => $required,
-            'description' => trim($hasRequiredFlag ? ($parts[3] ?? '') : ($parts[2] ?? '')),
+            'description' => $description,
+            'example' => $example,
         ];
     }
 
@@ -700,18 +710,8 @@ class DocumentationParser
     {
         $attributes = [];
 
-        try {
-            $methodCode = $this->getMethodSource($method);
-
-            // Match array keys: 'key' => ... or "key" => ...
-            preg_match_all("/['\"](\w+)['\"]\s*=>/", $methodCode, $matches);
-
-            foreach ($matches[1] as $attr) {
-                if (! isset($attributes[$attr])) {
-                    $attributes[$attr] = ['type' => $this->typeResolver->fromFieldName($attr)];
-                }
-            }
-        } catch (Throwable) {
+        foreach ($this->astReader->arrayKeys((string) $method->getFileName(), $method->getName()) as $attr) {
+            $attributes[$attr] = ['type' => $this->typeResolver->fromFieldName($attr)];
         }
 
         return $attributes;
@@ -728,29 +728,12 @@ class DocumentationParser
     {
         $relationships = [];
 
-        try {
-            $methodCode = $this->getMethodSource($method);
-
-            // Match: 'relationName' => fn() => XxxResource::make(...) or ::collection(...)
-            preg_match_all(
-                "/['\"](\w+)['\"]\s*=>\s*(?:fn\s*\(\)\s*=>)?\s*(\w+Resource)::(\w+)/",
-                $methodCode,
-                $matches,
-                PREG_SET_ORDER
-            );
-
-            foreach ($matches as $match) {
-                $name = $match[1];
-                $resourceClass = $match[2];
-                $methodName = $match[3];
-
-                $relationships[$name] = [
-                    'type' => Str::snake($name),
-                    'resource' => $this->resolveResourceClass($resourceClass, $ref),
-                    'collection' => $methodName === 'collection',
-                ];
-            }
-        } catch (Throwable) {
+        foreach ($this->astReader->relationLinks((string) $method->getFileName(), $method->getName()) as $name => $link) {
+            $relationships[$name] = [
+                'type' => Str::snake($name),
+                'resource' => $this->resolveResourceClass($link['resource'], $ref),
+                'collection' => $link['collection'],
+            ];
         }
 
         return $relationships;

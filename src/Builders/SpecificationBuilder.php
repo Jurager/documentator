@@ -6,6 +6,7 @@ use Illuminate\Support\Collection;
 use Illuminate\Support\Str;
 use Jurager\Documentator\Collectors\RouteCollector;
 use Jurager\Documentator\Formats\AbstractFormatInterface;
+use Jurager\Documentator\Generators\ExampleGenerator;
 use Jurager\Documentator\Parsers\DocumentationParser;
 use Jurager\Documentator\Resolvers\FieldTypeResolver;
 
@@ -38,8 +39,9 @@ class SpecificationBuilder
         $typeResolver = new FieldTypeResolver();
         $this->docExtractor = new DocumentationParser($typeResolver);
 
-        $schemaBuilder = new SchemaBuilder($this->config['type_map'] ?? []);
-        $this->format = $this->resolveFormat($schemaBuilder);
+        $examples = new ExampleGenerator();
+        $schemaBuilder = new SchemaBuilder($this->config['type_map'] ?? [], $examples);
+        $this->format = $this->resolveFormat($examples);
 
         $this->operationBuilder = new OperationBuilder(
             $schemaBuilder,
@@ -52,7 +54,7 @@ class SpecificationBuilder
     /**
      * Resolve response format from config.
      */
-    private function resolveFormat(SchemaBuilder $schemaBuilder): AbstractFormatInterface
+    private function resolveFormat(ExampleGenerator $examples): AbstractFormatInterface
     {
         $format = $this->config['format'];
 
@@ -62,7 +64,7 @@ class SpecificationBuilder
         ], $this->config['custom_formats'] ?? []);
 
         if (class_exists($format)) {
-            return new $format($schemaBuilder);
+            return new $format($examples);
         }
 
         if (! isset($formats[$format])) {
@@ -71,7 +73,7 @@ class SpecificationBuilder
             );
         }
 
-        return new $formats[$format]($schemaBuilder);
+        return new $formats[$format]($examples);
     }
 
     /**
