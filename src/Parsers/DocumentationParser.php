@@ -58,10 +58,12 @@ class DocumentationParser
         $summary = null;
         $descriptionLines = [];
         $parsingText = true;
+        $collectingDescription = false;
 
         foreach ($lines as $line) {
             if (str_starts_with($line, '@')) {
                 $parsingText = false;
+                $collectingDescription = false;
             }
 
             if ($parsingText) {
@@ -80,6 +82,8 @@ class DocumentationParser
             }
 
             if ($this->parseDescriptionTag($line, $descriptionLines)) {
+                $collectingDescription = true;
+
                 continue;
             }
 
@@ -105,6 +109,11 @@ class DocumentationParser
 
             if ($this->parseParamTags($line, $info)) {
                 continue;
+            }
+
+            // Строки-продолжения многострочного @description (тег на отдельной строке).
+            if ($collectingDescription) {
+                $descriptionLines[] = $line;
             }
         }
 
