@@ -13,7 +13,7 @@ This documentation explains how to install, configure, and use Jurager/Documenta
 
 ## Guides
 
-- [Generate Specification](generate-specification.md) - Run `docs:generate` and use command options.
+- [Generate Specification](generate-specification.md) - Run `documentator:generate` and use command options.
 - [Schema Detection](schema-detection.md) - How validation and resources are converted to schemas.
 - [PHPDoc Annotations](phpdoc-annotations.md) - Supported endpoint annotations.
 - [Response Formats](response-formats.md) - Built-in formats and custom format classes.

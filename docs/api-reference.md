@@ -35,5 +35,5 @@ weight: 90
 
 - merges package config,
 - publishes config with tag `documentator-config`,
-- registers `docs:generate` command,
+- registers `documentator:generate` command,
 - loads package translations in console context.

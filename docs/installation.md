@@ -22,13 +22,13 @@ This creates `config/documentator.php`.
 ## Verify Command
 
 ```bash
-php artisan list | grep docs:generate
+php artisan list | grep documentator:generate
 ```
 
 ## First Generation
 
 ```bash
-php artisan docs:generate
+php artisan documentator:generate
 ```
 
 Default output path:

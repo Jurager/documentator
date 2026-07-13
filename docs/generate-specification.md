@@ -8,14 +8,14 @@ weight: 40
 Use the Artisan command to build OpenAPI:
 
 ```bash
-php artisan docs:generate
+php artisan documentator:generate
 ```
 
 ## Options
 
 ```bash
-php artisan docs:generate --output=public/openapi.json
-php artisan docs:generate --format=json-api
+php artisan documentator:generate --output=public/openapi.json
+php artisan documentator:generate --format=json-api
 ```
 
 - `--output` overrides `output.path`.

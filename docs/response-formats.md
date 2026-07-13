@@ -21,7 +21,7 @@ Set in config:
 Override at runtime:
 
 ```bash
-php artisan docs:generate --format=json-api
+php artisan documentator:generate --format=json-api
 ```
 
 ## Register Custom Format

@@ -10,7 +10,7 @@ use Jurager\Documentator\Collectors\RouteCollector;
 
 class GenerateCommand extends Command implements Isolatable
 {
-    protected $signature = 'docs:generate
+    protected $signature = 'documentator:generate
                             {--output= : Override output path}
                             {--format= : Override response format}';
 

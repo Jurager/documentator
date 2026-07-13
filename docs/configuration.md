@@ -38,7 +38,7 @@ Main config file: `config/documentator.php`.
 > The generator command currently writes JSON output.
 
 > [!WARNING]
-> `output.format` exists in config, but `docs:generate` serializes output via `json_encode(...)` and writes JSON.
+> `output.format` exists in config, but `documentator:generate` serializes output via `json_encode(...)` and writes JSON.
 
 ## Servers
 
