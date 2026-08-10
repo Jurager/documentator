@@ -15,7 +15,7 @@ return [
     'openapi_version' => '3.0.3',
 
     'info' => [
-        'title' => env('OPENAPI_TITLE', 'API Documentation'),
+        'title' => env('OPENAPI_TITLE', strtoupper((string) env('APP_NAME', 'Laravel')).' Documentation'),
         'version' => env('OPENAPI_VERSION', '1.0.0'),
         'description' => env('OPENAPI_DESCRIPTION'),
         'contact' => [
