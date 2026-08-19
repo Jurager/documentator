@@ -11,4 +11,7 @@ return [
     'min' => 'min :value',
     'unique' => 'unique',
     'exists' => 'must exist',
+    'filter_operators' => 'Operators: :operators',
+    'sortable_fields' => 'Sortable fields: :fields',
+    'available_includes' => 'Available includes: :relations',
 ];

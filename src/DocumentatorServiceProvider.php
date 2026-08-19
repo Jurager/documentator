@@ -4,6 +4,7 @@ namespace Jurager\Documentator;
 
 use Illuminate\Support\ServiceProvider;
 use Jurager\Documentator\Commands\GenerateCommand;
+use Jurager\Documentator\Commands\LintCommand;
 
 class DocumentatorServiceProvider extends ServiceProvider
 {
@@ -24,6 +25,7 @@ class DocumentatorServiceProvider extends ServiceProvider
 
             $this->commands([
                 GenerateCommand::class,
+                LintCommand::class,
             ]);
         }
     }

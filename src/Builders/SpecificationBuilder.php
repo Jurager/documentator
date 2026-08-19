@@ -9,6 +9,7 @@ use Jurager\Documentator\Formats\AbstractFormatInterface;
 use Jurager\Documentator\Generators\ExampleGenerator;
 use Jurager\Documentator\Parsers\DocumentationParser;
 use Jurager\Documentator\Resolvers\FieldTypeResolver;
+use Jurager\Documentator\Support\ResourceAstReader;
 
 class SpecificationBuilder
 {
@@ -37,16 +38,19 @@ class SpecificationBuilder
     private function initializeDependencies(): void
     {
         $typeResolver = new FieldTypeResolver();
-        $this->docExtractor = new DocumentationParser($typeResolver);
+        $this->docExtractor = new DocumentationParser($typeResolver, presets: $this->config['presets'] ?? []);
 
         $examples = new ExampleGenerator();
         $schemaBuilder = new SchemaBuilder($this->config['type_map'] ?? [], $examples);
         $this->format = $this->resolveFormat($examples);
 
+        $autoParams = new AutoParameterBuilder(new ResourceAstReader());
+
         $this->operationBuilder = new OperationBuilder(
             $schemaBuilder,
             $this->docExtractor,
             $this->format,
+            $autoParams,
             $this->config
         );
     }

@@ -16,12 +16,14 @@ class OperationBuilder
      * @param  SchemaBuilder  $schemaBuilder  Schema builder for request/response schemas
      * @param  DocumentationParser  $docExtractor  Documentation and resource extractor
      * @param  AbstractFormatInterface  $format  Response format implementation
+     * @param  AutoParameterBuilder  $autoParams  Derives filter/sort/include params from model + resource code
      * @param  array  $config  Configuration array
      */
     public function __construct(
         private SchemaBuilder $schemaBuilder,
         private DocumentationParser $docExtractor,
         private AbstractFormatInterface $format,
+        private AutoParameterBuilder $autoParams,
         private array $config = []
     ) {
     }
@@ -52,8 +54,11 @@ class OperationBuilder
             }
         }
 
-        // Extract response data from Resource class
-        $responseData = $this->extractResponseData($route, $resource);
+        // Resolve resource/model classes once and reuse for both response data and auto-derived params
+        $namespaces = $this->config['resources']['namespaces'] ?? ['App\\Http\\Resources', 'App\\Models'];
+        $resourceClass = $this->findResponseResourceClass($route, $resource, $namespaces);
+        $modelClass = $this->docExtractor->guessModelClass($resource, $namespaces);
+        $responseData = $resourceClass ? $this->docExtractor->parseResource($resourceClass) : null;
 
         // Build operation
         $operation = array_filter([
@@ -62,7 +67,7 @@ class OperationBuilder
             'description' => $doc['description'] ?? null,
             'tags' => $doc['tags'] ?? $this->generateTags($segments),
             'deprecated' => $doc['deprecated'] ?? null,
-            'parameters' => $this->buildParameters($route, $method, $doc) ?: null,
+            'parameters' => $this->buildParameters($route, $method, $doc, $resourceClass, $modelClass, $isCollection) ?: null,
             'requestBody' => $requestBody,
             'responses' => $this->buildResponses($method, $resource, $doc, $responseData, $isCollection),
         ]);
@@ -86,9 +91,12 @@ class OperationBuilder
      * @param  Route  $route  Laravel route instance
      * @param  string  $method  HTTP method
      * @param  array  $doc  Parsed documentation
+     * @param  string|null  $resourceClass  Resource class backing the response, if resolved
+     * @param  string|null  $modelClass  Eloquent model class backing the resource, if resolved
+     * @param  bool  $isCollection  Whether this operation returns a collection
      * @return array OpenAPI parameters array
      */
-    private function buildParameters(Route $route, string $method, array $doc): array
+    private function buildParameters(Route $route, string $method, array $doc, ?string $resourceClass, ?string $modelClass, bool $isCollection): array
     {
         $params = [];
 
@@ -108,12 +116,12 @@ class OperationBuilder
             ];
         }
 
-        // Query parameters
+        // Query parameters, explicitly declared ones first so they win on name collision below
+        $queryNames = [];
+
         foreach ($doc['queryParams'] ?? [] as $p) {
-            // Convert dot notation to array notation: filter.name -> filter[name]
-            $name = str_contains($p['name'], '.')
-                ? explode('.', $p['name'])[0].'['.implode('][', array_slice(explode('.', $p['name']), 1)).']'
-                : $p['name'];
+            $name = $this->toQueryParamName($p['name']);
+            $queryNames[$name] = true;
 
             $params[] = [
                 'name' => $name,
@@ -124,7 +132,50 @@ class OperationBuilder
             ];
         }
 
+        // filter/sort/include derived from the model + resource, for whichever
+        // of them the docblock didn't already declare explicitly above.
+        if ($method === 'get' && $isCollection) {
+            foreach ($this->autoParams->build($resourceClass, $modelClass) as $p) {
+                $name = $this->toQueryParamName($p['name']);
+
+                if (isset($queryNames[$name])) {
+                    continue;
+                }
+
+                $queryNames[$name] = true;
+
+                $params[] = [
+                    'name' => $name,
+                    'in' => 'query',
+                    'required' => $p['required'],
+                    'schema' => ['type' => $this->normalizeType($p['type'])],
+                    'description' => $p['description'],
+                ];
+            }
+        }
+
+        // Header parameters
+        foreach ($doc['headers'] ?? [] as $p) {
+            $params[] = [
+                'name' => $p['name'],
+                'in' => 'header',
+                'required' => $p['required'],
+                'schema' => ['type' => $this->normalizeType($p['type'])],
+                'description' => $p['description'],
+            ];
+        }
+
         return $params;
+    }
+
+    /**
+     * Convert dot notation to array notation: filter.name -> filter[name].
+     */
+    private function toQueryParamName(string $name): string
+    {
+        return str_contains($name, '.')
+            ? explode('.', $name)[0].'['.implode('][', array_slice(explode('.', $name), 1)).']'
+            : $name;
     }
 
     /**
@@ -252,9 +303,9 @@ class OperationBuilder
     }
 
     /**
-     * Extract response data from Resource class.
+     * Resolve the Resource class backing an operation's response, if any.
      */
-    private function extractResponseData(Route $route, string $resource): ?array
+    private function findResponseResourceClass(Route $route, string $resource, array $namespaces): ?string
     {
         $action = $route->getActionName();
 
@@ -269,15 +320,10 @@ class OperationBuilder
 
         // Fallback: guess from resource name
         if (! $resourceClass) {
-            $namespaces = $this->config['resources']['namespaces'] ?? ['App\\Http\\Resources', 'App\\Models'];
             $resourceClass = $this->docExtractor->guessResourceClass($resource, $namespaces);
         }
 
-        if (! $resourceClass) {
-            return null;
-        }
-
-        return $this->docExtractor->parseResource($resourceClass);
+        return $resourceClass;
     }
 
     /**

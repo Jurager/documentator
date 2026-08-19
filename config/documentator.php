@@ -177,7 +177,7 @@ return [
     |--------------------------------------------------------------------------
     |
     | Configure namespaces where API resources and models are located.
-    | Used for automatic response schema detection and example generation.
+    | Used for automatic response schema detection, example generation.
     |
     */
 
@@ -275,11 +275,41 @@ return [
 
     /*
     |--------------------------------------------------------------------------
+    | Parameter Presets
+    |--------------------------------------------------------------------------
+    |
+    | Reusable definitions, referenced from a docblock with @preset <name>.
+    | Define a shared param once here instead of retyping its description on every endpoint.
+    |
+    | Example (inside a controller method's PHPDoc block):
+    |
+    |     @preset pagination
+    |     @preset accept-language
+    |
+    */
+
+    'presets' => [
+        'pagination' => [
+            'query' => [
+                'page[size] integer optional Number of items per page. Default: 15.',
+                'page[number] integer optional Page number. Default: 1.',
+            ],
+        ],
+
+        'accept-language' => [
+            'header' => [
+                'Accept-Language string optional Comma-separated list of preferred locales, e.g. `en_US,ru_RU`.',
+            ],
+        ],
+    ],
+
+    /*
+    |--------------------------------------------------------------------------
     | Response Definitions
     |--------------------------------------------------------------------------
     |
-    | Define reusable response components that can be referenced across
-    | multiple endpoints to maintain consistency and reduce duplication.
+    | Define reusable response components that can be referenced across multiple endpoints.
+    | To maintain consistency and reduce duplication.
     |
     */
 

@@ -25,9 +25,15 @@ class DocumentationParser
 
     private array $methodCache = [];
 
+    /**
+     * @param  array<string, array{query?: array<int, string>, header?: array<int, string>}>  $presets
+     *     Named collections of reusable @queryParam/@header definitions, keyed by preset name.
+     *     Expanded wherever an @preset tag references them, see config('documentator.presets').
+     */
     public function __construct(
         private FieldTypeResolver $typeResolver,
         private ResourceAstReader $astReader = new ResourceAstReader(),
+        private array $presets = [],
     ) {
     }
 
@@ -49,8 +55,11 @@ class DocumentationParser
             'queryParams' => [],
             'bodyParams' => [],
             'urlParams' => [],
+            'headers' => [],
             'responses' => [],
         ];
+
+        $presetNames = [];
 
         $lines = $this->extractLines($doc);
 
@@ -110,6 +119,10 @@ class DocumentationParser
                 continue;
             }
 
+            if ($this->parsePresetTag($line, $presetNames)) {
+                continue;
+            }
+
             // Строки-продолжения многострочного @description (тег на отдельной строке).
             if ($collectingDescription) {
                 $descriptionLines[] = $line;
@@ -124,6 +137,8 @@ class DocumentationParser
         if ($descriptionLines) {
             $info['description'] = trim(implode("\n", $descriptionLines));
         }
+
+        $this->applyPresets($presetNames, $info);
 
         return array_filter(
             $info,
@@ -281,6 +296,28 @@ class DocumentationParser
             $class = rtrim($ns, '\\').'\\'.$resourceName;
 
             if (class_exists($class) && $this->isResourceClass($class)) {
+                return $class;
+            }
+        }
+
+        return null;
+    }
+
+    /**
+     * Guess Eloquent model class from a resource/route name.
+     *
+     * @param  string  $resourceName  Resource name (e.g. from @resource or a route segment)
+     * @param  array  $namespaces  Namespaces to search, in order
+     * @return string|null Fully qualified model class name, or null if not found
+     */
+    public function guessModelClass(string $resourceName, array $namespaces = ['App\\Models']): ?string
+    {
+        $baseName = Str::studly(Str::singular($resourceName));
+
+        foreach ($namespaces as $ns) {
+            $class = rtrim($ns, '\\').'\\'.$baseName;
+
+            if (class_exists($class) && is_subclass_of($class, \Illuminate\Database\Eloquent\Model::class)) {
                 return $class;
             }
         }
@@ -458,6 +495,7 @@ class DocumentationParser
             'queryParam' => 'queryParams',
             'bodyParam' => 'bodyParams',
             'urlParam' => 'urlParams',
+            'header' => 'headers',
         ] as $tag => $key) {
             if (preg_match("/^@$tag\s+(.+)$/iu", $line, $m)) {
                 if ($param = $this->parseParam($m[1])) {
@@ -469,6 +507,76 @@ class DocumentationParser
         }
 
         return false;
+    }
+
+    /**
+     * Parse @preset tag from PHPDoc line. Presets are collected by name only;
+     * they're expanded into queryParams/headers once the whole doc block is read,
+     * so a preset declared before or after the params it complements works the same.
+     *
+     * @param string $line PHPDoc line
+     * @param array $presetNames Reference to collected preset names
+     * @return bool True if tag was parsed
+     */
+    private function parsePresetTag(string $line, array &$presetNames): bool
+    {
+        if (preg_match('/^@preset\s+(\S+)/iu', $line, $m)) {
+            $presetNames[] = trim($m[1]);
+
+            return true;
+        }
+
+        return false;
+    }
+
+    /**
+     * Expand referenced presets into queryParams/headers.
+     *
+     * A param explicitly declared in the doc block always wins over the same
+     * param name coming from a preset, so a method can still override a single
+     * field (e.g. a different page[size] default) without dropping the preset.
+     *
+     * @param array $presetNames Preset names referenced via @preset
+     * @param array $info Reference to info array being built
+     */
+    private function applyPresets(array $presetNames, array &$info): void
+    {
+        foreach ($presetNames as $name) {
+            $preset = $this->presets[$name] ?? null;
+
+            if (! $preset) {
+                continue;
+            }
+
+            foreach ($preset['query'] ?? [] as $text) {
+                if ($param = $this->parseParam($text)) {
+                    $this->mergeParam($info['queryParams'], $param);
+                }
+            }
+
+            foreach ($preset['header'] ?? [] as $text) {
+                if ($param = $this->parseParam($text)) {
+                    $this->mergeParam($info['headers'], $param);
+                }
+            }
+        }
+    }
+
+    /**
+     * Append a preset-sourced param unless a param with the same name is already present.
+     *
+     * @param array $params Reference to target param list (queryParams or headers)
+     * @param array $param Param definition to merge in
+     */
+    private function mergeParam(array &$params, array $param): void
+    {
+        foreach ($params as $existing) {
+            if ($existing['name'] === $param['name']) {
+                return;
+            }
+        }
+
+        $params[] = $param;
     }
 
     /**

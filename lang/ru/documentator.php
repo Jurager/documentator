@@ -11,4 +11,7 @@ return [
     'min' => 'мин. :value',
     'unique' => 'уникальное',
     'exists' => 'должно существовать',
+    'filter_operators' => 'Операторы: :operators',
+    'sortable_fields' => 'Поля для сортировки. Доступны: :fields',
+    'available_includes' => 'Связи (:relations)',
 ];
