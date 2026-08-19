@@ -2,10 +2,14 @@
 
 namespace Jurager\Documentator\Builders;
 
+use Illuminate\Database\Eloquent\Model;
 use Illuminate\Routing\Route;
 use Illuminate\Support\Str;
 use Jurager\Documentator\Parsers\DocumentationParser;
 use Jurager\Documentator\Formats\AbstractFormatInterface;
+use ReflectionMethod;
+use ReflectionNamedType;
+use Throwable;
 
 /**
  * Builds complete OpenAPI operations including parameters, request body, and responses.
@@ -103,7 +107,7 @@ class OperationBuilder
         // Path parameters
         foreach ($route->parameterNames() as $name) {
             $urlParam = collect($doc['urlParams'] ?? [])->firstWhere('name', $name);
-            $type = $this->normalizeType($urlParam['type'] ?? 'string');
+            $type = $this->normalizeType($urlParam['type'] ?? $this->guessPathParamType($route, $name));
             $params[] = [
                 'name' => $name,
                 'in' => 'path',
@@ -133,9 +137,11 @@ class OperationBuilder
         }
 
         // filter/sort/include derived from the model + resource, for whichever
-        // of them the docblock didn't already declare explicitly above.
-        if ($method === 'get' && $isCollection) {
-            foreach ($this->autoParams->build($resourceClass, $modelClass) as $p) {
+        // of them the docblock didn't already declare explicitly above. filter/sort
+        // are skipped for single-resource endpoints inside build() itself; include
+        // still applies there — a `show` response can eager-load a relation too.
+        if ($method === 'get') {
+            foreach ($this->autoParams->build($resourceClass, $modelClass, $isCollection) as $p) {
                 $name = $this->toQueryParamName($p['name']);
 
                 if (isset($queryNames[$name])) {
@@ -166,6 +172,44 @@ class OperationBuilder
         }
 
         return $params;
+    }
+
+    /**
+     * Infer a path parameter's OpenAPI type from the Eloquent model Laravel's own
+     * implicit route-model-binding would resolve it to — the exact match Laravel
+     * performs itself: the controller action's parameter whose name (camelCased)
+     * equals the route parameter name. Falls back to 'string' when the route
+     * parameter isn't bound to a model (e.g. a plain scalar segment) or when a
+     * docblock hasn't overridden it via @urlParam and nothing can be resolved.
+     */
+    private function guessPathParamType(Route $route, string $name): string
+    {
+        $action = $route->getActionName();
+
+        if ($action === 'Closure' || ! str_contains($action, '@')) {
+            return 'string';
+        }
+
+        [$controllerClass, $controllerMethod] = explode('@', $action, 2);
+
+        if (! class_exists($controllerClass) || ! method_exists($controllerClass, $controllerMethod)) {
+            return 'string';
+        }
+
+        try {
+            $reflectionParam = collect((new ReflectionMethod($controllerClass, $controllerMethod))->getParameters())
+                ->first(fn ($p) => $p->getName() === Str::camel($name));
+
+            $type = $reflectionParam?->getType();
+
+            if (! $type instanceof ReflectionNamedType || $type->isBuiltin() || ! is_a($type->getName(), Model::class, true)) {
+                return 'string';
+            }
+
+            return (new $type->getName())->getKeyType() === 'int' ? 'integer' : 'string';
+        } catch (Throwable) {
+            return 'string';
+        }
     }
 
     /**

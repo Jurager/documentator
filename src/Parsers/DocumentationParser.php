@@ -3,6 +3,7 @@
 namespace Jurager\Documentator\Parsers;
 
 use Illuminate\Http\Request;
+use Illuminate\Http\Resources\Json\ResourceCollection;
 use Illuminate\Routing\Route;
 use Illuminate\Support\Str;
 use Jurager\Documentator\Resolvers\FieldTypeResolver;
@@ -898,6 +899,10 @@ class DocumentationParser
     private function isResourceClass(string $class): bool
     {
         if (! class_exists($class)) {
+            return false;
+        }
+
+        if (is_a($class, ResourceCollection::class, true)) {
             return false;
         }
 
