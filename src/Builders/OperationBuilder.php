@@ -95,12 +95,16 @@ class OperationBuilder
         // Path parameters
         foreach ($route->parameterNames() as $name) {
             $urlParam = collect($doc['urlParams'] ?? [])->firstWhere('name', $name);
+            $type = $this->normalizeType($urlParam['type'] ?? 'string');
             $params[] = [
                 'name' => $name,
                 'in' => 'path',
                 'required' => $urlParam['required'] ?? true,
-                'schema' => ['type' => $this->normalizeType($urlParam['type'] ?? 'string')],
+                'schema' => ['type' => $type],
                 'description' => $urlParam['description'] ?? __('documentator::documentator.id_of', ['name' => Str::headline($name)]),
+                // A stable example fills the URL placeholder, so generated links
+                // never collapse into "//" when the value is absent.
+                'example' => $urlParam['example'] ?? $this->exampleFor($type),
             ];
         }
 
@@ -371,6 +375,20 @@ class OperationBuilder
             'int', 'integer', 'numeric' => 'integer',
             'float', 'double', 'number' => 'number',
             'bool', 'boolean' => 'boolean',
+            default => 'string',
+        };
+    }
+
+    /**
+     * A deterministic stand-in value for a parameter, by OpenAPI type. It must
+     * not be random: the value lands in the generated spec, so a random one
+     * would make every sync rewrite the request and never settle.
+     */
+    private function exampleFor(string $type): int|bool|string
+    {
+        return match ($type) {
+            'integer', 'number' => 1,
+            'boolean' => true,
             default => 'string',
         };
     }
