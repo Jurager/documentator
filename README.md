@@ -3,6 +3,7 @@
 [![Total Downloads](https://poser.pugx.org/jurager/documentator/downloads)](https://packagist.org/packages/jurager/documentator)
 [![PHP Version Require](https://poser.pugx.org/jurager/documentator/require/php)](https://packagist.org/packages/jurager/documentator)
 [![License](https://poser.pugx.org/jurager/documentator/license)](https://packagist.org/packages/jurager/documentator)
+[![Ko-fi](https://img.shields.io/badge/Ko--fi-support-FF5E5B?logo=ko-fi&logoColor=white)](https://ko-fi.com/jurager01)
 
 This Laravel package generates OpenAPI specifications from routes, validation rules, and API resources.
 
