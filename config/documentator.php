@@ -1,21 +1,22 @@
 <?php
 
+use Jurager\Documentator\Formats\SimpleFormat;
+
 return [
 
     /*
     |--------------------------------------------------------------------------
-    | OpenAPI Specification
+    | OpenAPI
     |--------------------------------------------------------------------------
     |
-    | Configure the OpenAPI specification version and basic metadata for your
-    | API documentation. This information appears in the generated OpenAPI file.
+    | OpenAPI 3.0.x version and API information shown in your documentation.
     |
     */
 
     'openapi_version' => '3.0.3',
 
     'info' => [
-        'title' => env('OPENAPI_TITLE', strtoupper((string) env('APP_NAME', 'Laravel')).' Documentation'),
+        'title' => env('OPENAPI_TITLE', env('APP_NAME', 'Laravel').' API'),
         'version' => env('OPENAPI_VERSION', '1.0.0'),
         'description' => env('OPENAPI_DESCRIPTION'),
         'contact' => [
@@ -31,61 +32,68 @@ return [
 
     /*
     |--------------------------------------------------------------------------
-    | Output Configuration
+    | Servers
     |--------------------------------------------------------------------------
     |
-    | Specify where the generated OpenAPI specification file should be saved.
-    | Supports both JSON and YAML formats based on file extension.
+    | Base URLs for the documented API environments.
+    |
+    */
+
+    'servers' => [
+        ['url' => env('APP_URL', 'http://localhost')],
+    ],
+
+    /*
+    |--------------------------------------------------------------------------
+    | Routes
+    |--------------------------------------------------------------------------
+    |
+    | URI patterns, middleware and HTTP methods included in the specification.
+    | Exclusions take priority over include patterns.
+    |
+    */
+
+    'routes' => [
+        'include' => ['api/*'],
+        'exclude' => ['sanctum/*', 'horizon/*', 'telescope/*', '_ignition/*', '__clockwork/*', 'livewire/*'],
+        'exclude_middleware' => [],
+        'methods' => ['GET', 'POST', 'PUT', 'PATCH', 'DELETE'],
+    ],
+
+    /*
+    |--------------------------------------------------------------------------
+    | Output
+    |--------------------------------------------------------------------------
+    |
+    | JSON output path and formatting. Relative paths start at the application
+    | root.
     |
     */
 
     'output' => [
         'path' => env('OPENAPI_OUTPUT', 'docs/openapi.json'),
-        'format' => env('OPENAPI_OUTPUT_FORMAT', 'json'),
         'pretty_print' => env('OPENAPI_PRETTY_PRINT', true),
     ],
 
     /*
     |--------------------------------------------------------------------------
-    | Server Configuration
+    | Response Format
     |--------------------------------------------------------------------------
     |
-    | Define the servers where your API is hosted. Multiple servers can be
-    | specified for different environments (development, staging, production).
+    | Response format used to document your API. Select a built-in format or
+    | your own response format class.
     |
     */
 
-    'servers' => [
-        [
-            'url' => env('APP_URL', 'http://localhost'),
-            'description' => 'Development server',
-        ],
-        // Example: Using server variables for flexible base URL in API clients
-        // (Hoppscotch, Insomnia, Postman) that map variables to environments.
-        // [
-        //     'url' => '{protocol}://{host}',
-        //     'description' => 'Configurable server',
-        //     'variables' => [
-        //         'protocol' => [
-        //             'default' => 'https',
-        //             'enum' => ['http', 'https'],
-        //             'description' => 'Protocol',
-        //         ],
-        //         'host' => [
-        //             'default' => 'api.example.com',
-        //             'description' => 'API host',
-        //         ],
-        //     ],
-        // ],
-    ],
+    'format' => env('OPENAPI_FORMAT', SimpleFormat::class),
 
     /*
     |--------------------------------------------------------------------------
-    | Security Configuration
+    | Security
     |--------------------------------------------------------------------------
     |
-    | Define authentication and authorization schemes for your API.
-    | Common schemes: bearerAuth (JWT), apiKey, oauth2, openIdConnect.
+    | Authentication schemes and their defaults. Use @unauthenticated on public
+    | endpoints, or an empty default array to disable default authentication.
     |
     */
 
@@ -95,181 +103,64 @@ return [
                 'type' => 'http',
                 'scheme' => 'bearer',
                 'bearerFormat' => 'JWT',
-                'description' => 'Enter your bearer token in the format: Bearer {token}',
             ],
-            // 'apiKey' => [
-            //     'type' => 'apiKey',
-            //     'in' => 'header',
-            //     'name' => 'X-API-Key',
-            //     'description' => 'API key for authentication',
-            // ],
-            // 'oauth2' => [
-            //     'type' => 'oauth2',
-            //     'flows' => [
-            //         'authorizationCode' => [
-            //             'authorizationUrl' => 'https://example.com/oauth/authorize',
-            //             'tokenUrl' => 'https://example.com/oauth/token',
-            //             'scopes' => [
-            //                 'read' => 'Read access',
-            //                 'write' => 'Write access',
-            //             ],
-            //         ],
-            //     ],
-            // ],
         ],
-
         'default' => ['bearerAuth'],
     ],
 
     /*
     |--------------------------------------------------------------------------
-    | Response Format
+    | Resources
     |--------------------------------------------------------------------------
     |
-    | Select the response format for your API documentation.
-    | Built-in formats: "simple" (standard REST), "json-api" (JSON:API spec).
-    | You can register custom formats in the 'custom_formats' section below.
-    |
-    */
-
-    'format' => env('OPENAPI_FORMAT', 'simple'),
-
-    'custom_formats' => [
-        // 'hal' => App\OpenApi\Formats\HalFormat::class,
-        // 'graphql' => App\OpenApi\Formats\GraphQLFormat::class,
-    ],
-
-    /*
-    |--------------------------------------------------------------------------
-    | Route Discovery
-    |--------------------------------------------------------------------------
-    |
-    | Configure which routes should be included in the documentation.
-    | Routes are filtered based on URI patterns, middleware, and HTTP methods.
-    |
-    */
-
-    'routes' => [
-        'include' => [
-            'api/*',
-        ],
-
-        'exclude' => [
-            'sanctum/*',
-            'horizon/*',
-            'telescope/*',
-            '_ignition/*',
-            '__clockwork/*',
-            'livewire/*',
-        ],
-
-        'exclude_middleware' => [
-            // 'web',
-            // 'internal',
-        ],
-
-        'methods' => ['GET', 'POST', 'PUT', 'PATCH', 'DELETE'],
-    ],
-
-    /*
-    |--------------------------------------------------------------------------
-    | Resource Discovery
-    |--------------------------------------------------------------------------
-    |
-    | Configure namespaces where API resources and models are located.
-    | Used for automatic response schema detection, example generation.
+    | Namespaces searched for API resources and Eloquent models.
     |
     */
 
     'resources' => [
-        'namespaces' => [
-            'App\\Http\\Resources',
-            'App\\Models',
-        ],
-
-        'suffix' => 'Resource',
+        'namespaces' => ['App\\Http\\Resources', 'App\\Models'],
     ],
 
     /*
     |--------------------------------------------------------------------------
-    | Example Generation
+    | Examples
     |--------------------------------------------------------------------------
     |
-    | Configure how example data is generated for the documentation.
-    | Uses FakerPHP for realistic fake data generation.
+    | Automatic examples. An integer seed makes generation repeatable; use null
+    | for unseeded values. Explicit PHPDoc examples are always kept.
     |
     */
 
     'examples' => [
         'enabled' => true,
-
-        'locale' => env('FAKER_LOCALE', 'en_US'),
-
-        'seed' => null,
-
-        'collection_size' => 2,
-
-        'pagination' => [
-            'total' => 100,
-            'per_page' => 15,
-            'current_page' => 1,
-        ],
+        'seed' => 0,
     ],
 
     /*
     |--------------------------------------------------------------------------
-    | Type Mapping
+    | Validation Types
     |--------------------------------------------------------------------------
     |
-    | Map Laravel validation rules and PHP types to OpenAPI types.
-    | Customize this mapping to match your API's data structure conventions.
+    | Additional validation-rule mappings to OpenAPI types. Built-in rules are
+    | supported without entries here.
     |
     */
 
-    'type_map' => [
-        'int' => 'integer',
-        'integer' => 'integer',
-        'numeric' => 'integer',
-        'bool' => 'boolean',
-        'boolean' => 'boolean',
-        'float' => 'number',
-        'double' => 'number',
-        'decimal' => 'number',
-        'number' => 'number',
-        'string' => 'string',
-        'email' => 'string',
-        'url' => 'string',
-        'uuid' => 'string',
-        'json' => 'object',
-        'array' => 'array',
-        'object' => 'object',
-        'file' => 'string',
-        'image' => 'string',
-        'mimes' => 'string',
-        'date' => 'string',
-        'datetime' => 'string',
-        'timestamp' => 'string',
-    ],
+    'type_map' => [],
 
     /*
     |--------------------------------------------------------------------------
-    | Tags Configuration
+    | Tags
     |--------------------------------------------------------------------------
     |
-    | Organize your endpoints into logical groups using tags.
-    | Tags can be auto-generated from route prefixes or explicitly defined.
+    | Endpoint groups and their descriptions. Missing groups may be generated
+    | and sorted automatically.
     |
     */
 
     'tags' => [
         'auto_generate' => true,
-
-        'definitions' => [
-            // 'Users' => 'User management and profile operations',
-            // 'Auth' => 'Authentication and authorization endpoints',
-            // 'Posts' => 'Blog posts and content management',
-        ],
-
+        'definitions' => [],
         'sort' => true,
     ],
 
@@ -278,13 +169,7 @@ return [
     | Parameter Presets
     |--------------------------------------------------------------------------
     |
-    | Reusable definitions, referenced from a docblock with @preset <name>.
-    | Define a shared param once here instead of retyping its description on every endpoint.
-    |
-    | Example (inside a controller method's PHPDoc block):
-    |
-    |     @preset pagination
-    |     @preset accept-language
+    | Shared query and header parameters applied with @preset <name>.
     |
     */
 
@@ -295,76 +180,24 @@ return [
                 'page[number] integer optional Page number. Default: 1.',
             ],
         ],
-
         'accept-language' => [
             'header' => [
-                'Accept-Language string optional Comma-separated list of preferred locales, e.g. `en_US,ru_RU`.',
+                'Accept-Language string optional Preferred language.',
             ],
         ],
     ],
 
     /*
     |--------------------------------------------------------------------------
-    | Response Definitions
+    | Responses
     |--------------------------------------------------------------------------
     |
-    | Define reusable response components that can be referenced across multiple endpoints.
-    | To maintain consistency and reduce duplication.
+    | Responses added to every operation and descriptions for HTTP status codes.
     |
     */
 
     'responses' => [
-        'default' => [
-            // '401' => ['$ref' => '#/components/responses/Unauthorized'],
-            // '403' => ['$ref' => '#/components/responses/Forbidden'],
-            // '500' => ['$ref' => '#/components/responses/ServerError'],
-        ],
-
-        'descriptions' => [
-            200 => 'Successful response',
-            201 => 'Resource created successfully',
-            204 => 'Resource deleted successfully',
-            400 => 'Bad request - Invalid input',
-            401 => 'Unauthorized - Authentication required',
-            403 => 'Forbidden - Insufficient permissions',
-            404 => 'Resource not found',
-            422 => 'Validation error - Invalid input data',
-            429 => 'Too many requests - Rate limit exceeded',
-            500 => 'Internal server error',
-            503 => 'Service unavailable',
-        ],
+        'default' => [],
+        'descriptions' => [],
     ],
-
-    /*
-    |--------------------------------------------------------------------------
-    | Localization
-    |--------------------------------------------------------------------------
-    |
-    | Configure the language for auto-generated descriptions, summaries,
-    | and other documentation text.
-    |
-    */
-
-    'locale' => env('OPENAPI_LOCALE', 'en'),
-
-    /*
-    |--------------------------------------------------------------------------
-    | Advanced Options
-    |--------------------------------------------------------------------------
-    |
-    | Additional configuration options for fine-tuning the documentation
-    | generation process and output.
-    |
-    */
-
-    'advanced' => [
-        'cache_parsed_files' => true,
-
-        'include_deprecated' => false,
-
-        'validate_schemas' => env('OPENAPI_VALIDATE', true),
-
-        'deep_scan_controllers' => true,
-    ],
-
 ];

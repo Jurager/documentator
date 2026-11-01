@@ -1,39 +1,18 @@
 ---
-title: API Reference
+title: Using PHP
 weight: 90
 ---
 
-# API Reference
+# Using PHP
 
-## Main Entry Points
+Generate a specification from your application's registered routes:
 
-- `Jurager\Documentator\Commands\GenerateCommand`
-- `Jurager\Documentator\DocumentatorServiceProvider`
+```php
+use Jurager\Documentator\Documentator;
 
-## Core Builders
+$specification = app(Documentator::class)->generate();
+```
 
-- `Builders\SpecificationBuilder` - orchestrates full OpenAPI document build.
-- `Builders\OperationBuilder` - builds operation-level metadata, params, request body, and responses.
-- `Builders\SchemaBuilder` - converts validation/doc fields into schema definitions and examples.
+The returned array uses the same configuration as `documentator:generate`. Laravel must be bootstrapped and your routes registered before generating it.
 
-## Parsing and Collection
-
-- `Collectors\RouteCollector` - route filtering and normalization.
-- `Parsers\DocumentationParser` - PHPDoc parsing, validation extraction, resource parsing.
-- `Resolvers\FieldTypeResolver` - field-name-based type hints for examples.
-
-## Format Layer
-
-- `Formats\AbstractFormatInterface`
-- `Formats\AbstractFormat`
-- `Formats\SimpleFormat`
-- `Formats\JsonApiFormat`
-
-## Service Provider Behavior
-
-`DocumentatorServiceProvider`:
-
-- merges package config,
-- publishes config with tag `documentator-config`,
-- registers `documentator:generate` command,
-- loads package translations in console context.
+For file output, use the [Artisan command](generate-specification.md). For another response envelope, see [Custom Formats](response-formats.md#custom-formats).

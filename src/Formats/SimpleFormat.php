@@ -4,16 +4,6 @@ namespace Jurager\Documentator\Formats;
 
 class SimpleFormat extends AbstractFormat
 {
-    public function name(): string
-    {
-        return 'simple';
-    }
-
-    public function description(): string
-    {
-        return 'REST API';
-    }
-
     protected function successSchema(): string
     {
         return 'SuccessResponse';
@@ -30,7 +20,7 @@ class SimpleFormat extends AbstractFormat
             'SuccessResponse' => [
                 'type' => 'object',
                 'properties' => [
-                    'success' => ['type' => 'boolean', 'example' => true],
+                    'success' => ['type' => 'boolean', 'enum' => [true]],
                     'data' => ['oneOf' => [
                         ['type' => 'object', 'additionalProperties' => true],
                         ['type' => 'array', 'items' => ['type' => 'object']],
@@ -45,7 +35,7 @@ class SimpleFormat extends AbstractFormat
             'ErrorResponse' => [
                 'type' => 'object',
                 'properties' => [
-                    'success' => ['type' => 'boolean', 'example' => false],
+                    'success' => ['type' => 'boolean', 'enum' => [false]],
                     'message' => ['type' => 'string'],
                     'errors' => [
                         'type' => 'object',
@@ -59,57 +49,28 @@ class SimpleFormat extends AbstractFormat
         ];
     }
 
-    public function operationResponse(string $method, string $resource, ?array $responseData = null, bool $isCollection = false): array
+    public function response(string $resource, array $data = [], bool $collection = false): array
     {
-        $status = match ($method) {
-            'post' => '201',
-            'delete' => '204',
-            default => '200',
-        };
-
-        if ($status === '204') {
-            return [$status => ['description' => 'No Content']];
-        }
-
-        $attributes = $this->getAttributes($responseData);
-
+        $properties = $this->getAttributes($data);
+        $item = ['type' => 'object', 'properties' => $properties ?: (object) []];
         $schema = [
             'type' => 'object',
             'properties' => [
-                'success' => ['type' => 'boolean', 'example' => true],
+                'success' => ['type' => 'boolean', 'enum' => [true]],
+                'data' => $collection ? ['type' => 'array', 'items' => $item] : $item,
             ],
         ];
-
-        if ($isCollection) {
-            $schema['properties']['data'] = [
-                'type' => 'array',
-                'items' => ['type' => 'object'],
-                'example' => [
-                    $this->examples->generateObject($attributes),
-                    $this->examples->generateObject($attributes, 2),
-                ],
-            ];
+        if ($collection) {
             $schema['properties']['meta'] = [
                 'type' => 'object',
-                'example' => [
-                    'total' => $this->examples->randomInt(50, 500),
-                    'page' => 1,
-                    'per_page' => 15,
+                'properties' => [
+                    'total' => ['type' => 'integer', 'minimum' => 0],
+                    'page' => ['type' => 'integer', 'minimum' => 1],
+                    'per_page' => ['type' => 'integer', 'minimum' => 1],
                 ],
-            ];
-        } else {
-            $schema['properties']['data'] = [
-                'type' => 'object',
-                'example' => $this->examples->generateObject($attributes),
             ];
         }
 
-        return [$status => [
-            'description' => match ($status) {
-                '201' => 'Created',
-                default => 'Success',
-            },
-            'content' => ['application/json' => ['schema' => $schema]],
-        ]];
+        return ['content' => [$this->mediaType => ['schema' => $schema]]];
     }
 }

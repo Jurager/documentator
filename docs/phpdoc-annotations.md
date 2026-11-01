@@ -1,107 +1,106 @@
 ---
-title: PHPDoc Annotations
+title: Documenting Endpoints
 weight: 60
 ---
 
-# PHPDoc Annotations
+# Documenting Endpoints
 
-Documentator parses PHPDoc comments on controller methods.
-
-## Supported Tags
-
-- `@summary text`
-- `@description text`
-- `@group Name`
-- `@resource name`
-- `@queryParam name type [required|optional] description`
-- `@bodyParam name type [required|optional] description`
-- `@urlParam name type [required|optional] description`
-- `@header name type [required|optional] description`
-- `@preset name`
-- `@response [status] {...json...}`
-- `@deprecated`
-- `@authenticated`
-- `@unauthenticated`
-
-## Example
+Add PHPDoc to controller methods to describe your endpoints. The first line becomes the summary; the following text becomes the description:
 
 ```php
 /**
- * List users
+ * List users.
  *
- * @summary Get users
- * @description Returns paginated user list.
+ * Returns users visible to the current account.
+ *
  * @group Users
- * @queryParam page integer optional Page number
- * @queryParam per_page integer optional Items per page
- * @response 200 {"success":true,"data":[]}
+ * @queryParam search string optional Filter by name. Example: Alice
  */
 public function index()
 {
+    return UserResource::collection(User::paginate());
 }
 ```
+
+## Parameters
+
+Use `@queryParam`, `@urlParam`, or `@header` to describe a parameter:
+
+```php
+/**
+ * @urlParam user integer required The user ID. Example: 42
+ * @queryParam include string optional Related resources to include.
+ * @header Accept-Language string optional Preferred language. Example: en
+ */
+```
+
+Each definition contains a name, type, `required` or `optional`, and a description. Add `Example:` to provide a value. Parameter types include `string`, `integer`, `number`, `boolean`, `object`, and arrays such as `integer[]`.
+
+URL parameter names must match the route placeholders. OpenAPI path parameters are always required.
+
+## Request Fields
+
+Use `@bodyParam` to add descriptions or examples to fields discovered from validation rules:
+
+```php
+/**
+ * @bodyParam name string required The user's display name. Example: Alice
+ * @bodyParam items[].id integer required The product ID. Example: 42
+ * @bodyParam attachments file[] optional Supporting documents.
+ */
+```
+
+Both Laravel dot notation (`items.*.id`) and bracket notation (`items[].id`) are supported.
+
+## Response Examples
+
+Add `@response` to document an endpoint's response:
+
+```php
+/**
+ * @response 200 {"success":true,"data":{"id":42,"name":"Alice"}}
+ * @response 404 {"message":"User not found."}
+ */
+```
+
+Explicit responses replace the automatically generated success response. Omit the status code to use 200. Write each example on one line.
 
 ## Presets
 
-A repeated parameter — `page[size]`, `Accept-Language`, and the like — tends to drift: the same field ends up with a slightly different description on every endpoint that accepts it. `@preset name` pulls a predefined set of `@queryParam`/`@header` definitions from `config('documentator.presets')` instead of retyping them:
-
-```php
-/**
- * @summary List users
- * @preset pagination
- * @preset accept-language
- */
-public function index()
-{
-}
-```
-
-A param declared explicitly in the same doc block always wins over the same-named param coming from a preset, so one endpoint can still override a single field — a different `page[size]` default, say — without abandoning the preset for everything else:
-
-```php
-/**
- * @preset pagination
- * @queryParam page[size] integer optional Capped at 50 for this endpoint. Default: 15.
- */
-public function index()
-{
-}
-```
-
-Define presets in `config/documentator.php`:
+Define repeated parameters once in `config/documentator.php`:
 
 ```php
 'presets' => [
-    'pagination' => [
-        'query' => [
-            'page[size] integer optional Number of items per page. Default: 15.',
-            'page[number] integer optional Page number. Default: 1.',
-        ],
-    ],
-    'accept-language' => [
+    'locale' => [
         'header' => [
-            'Accept-Language string optional Comma-separated list of preferred locales.',
+            'Accept-Language string optional Preferred language. Example: en',
         ],
     ],
 ],
 ```
 
-## Catching Drift
+Apply a preset to any endpoint:
 
-Presets prevents duplication for the parameters it covers, so command `documentator:lint` catches everything else. It scans every documented operation and reports any query or header parameter whose type or description differs between endpoints:
-
-```shell
-php artisan documentator:lint
+```php
+/**
+ * @preset pagination
+ * @preset locale
+ */
 ```
 
-The command exits non-zero when it finds inconsistencies, so it can run in CI alongside `documentator:generate`.
+The package includes `pagination` and `accept-language` presets. A parameter declared on the method overrides the same name from a preset.
 
-## Notes
+Run `php artisan documentator:lint` to check shared query parameters and headers for inconsistent descriptions or types.
 
-- The first free-text line becomes `summary` if `@summary` is not provided.
-- `@response` accepts JSON (object/array) or plain text example.
-- `@unauthenticated` sets operation-level `security: []`.
-- `@header` parameters are documented the same way regardless of HTTP method.
+## Endpoint Options
 
-> [!WARNING]
-> `@urlParam` names must match actual route parameter names to override autogenerated descriptions/types.
+| Tag | Purpose |
+| --- | --- |
+| `@group Users` | Group the endpoint under a tag. |
+| `@resource users` | Set the resource name used for discovery and schema naming. |
+| `@unauthenticated` | Document a public endpoint without default authentication. |
+| `@deprecated` | Mark the endpoint as deprecated. |
+| `@summary text` | Override the summary. |
+| `@description text` | Add a description, including subsequent lines. |
+
+Authentication is inherited from your [configuration](configuration.md#authentication). These annotations describe your API; they do not change route access.

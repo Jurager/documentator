@@ -1,6 +1,13 @@
 <?php
 
 return [
+    'success_response' => 'Successful response',
+    'created_response' => 'Resource created',
+    'bad_request' => 'Bad request',
+    'unauthorized' => 'Unauthorized',
+    'not_found' => 'Not found',
+    'validation_error' => 'Validation error',
+    'no_content' => 'No content',
     'list' => 'List :resource',
     'get' => 'Get :resource',
     'create' => 'Create :resource',

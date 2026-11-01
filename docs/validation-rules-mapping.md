@@ -1,35 +1,39 @@
 ---
-title: Validation Rules Mapping
+title: Validation Rules
 weight: 80
 ---
 
-# Validation Rules Mapping
+# Validation Rules
 
-Schema type detection uses `type_map` from config.
+Documentator uses validation rules to describe request fields.
 
-Default mapping includes:
+| Rule | OpenAPI type |
+| --- | --- |
+| `integer`, `int` | `integer` |
+| `numeric`, `decimal`, `float`, `double`, `number` | `number` |
+| `boolean`, `bool` | `boolean` |
+| `array` | `array` |
+| `object` | `object` |
+| `string`, `json`, `file`, `image` | `string` |
 
-- `integer`, `int`, `numeric` -> `integer`
-- `boolean`, `bool` -> `boolean`
-- `float`, `double`, `decimal`, `number` -> `number`
-- `string` -> `string`
-- `array` -> `array`
-- `json`, `object` -> `object`
-- `file`, `image`, `mimes` -> `string`
-- `date`, `datetime`, `timestamp` -> `string`
+The `email`, `url`, `uuid`, and `date` rules add their corresponding formats. File and image fields use the binary format.
 
-## Rule Attributes
+## Constraints
 
-Specific rules are also translated to schema attributes:
+`required` makes a field mandatory on its containing object. `nullable` allows null. A `sometimes|required` field remains optional in the generated schema.
 
-- `min:N` -> `minLength` / `minimum`
-- `max:N` -> `maxLength` / `maximum`
-- `in:a,b,c` -> `enum`
-- `email` -> `format: email`
-- `url` -> `format: uri`
-- `uuid` -> `format: uuid`
-- `nullable` -> `nullable: true`
+`min` and `max` describe string length, array size, or numeric bounds. File size rules are not converted into string lengths.
 
-## Override Mapping
+`in` and `Rule::in(...)` provide allowed values. Unique and existence rules add descriptions. Other rule objects and conditional rules may need [explicit documentation](phpdoc-annotations.md#request-fields).
 
-Update `type_map` in `config/documentator.php` to change type behavior globally.
+## Custom Types
+
+Add or override rule types in `config/documentator.php`:
+
+```php
+'type_map' => [
+    'money' => 'number',
+],
+```
+
+This mapping describes the rule in OpenAPI; it does not register a Laravel validation rule.

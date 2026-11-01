@@ -1,44 +1,41 @@
 ---
-title: Generate Specification
+title: Generating Documentation
 weight: 40
 ---
 
-# Generate Specification
+# Generating Documentation
 
-Use the Artisan command to build OpenAPI:
+Generate a specification from your application's registered routes:
 
 ```bash
 php artisan documentator:generate
 ```
 
-## Options
+The command writes `docs/openapi.json` and displays the number of routes it processed. Run it again after changing your API.
+
+## Command Options
+
+Use `--output` to choose another destination and `--format` to override the configured response format:
 
 ```bash
 php artisan documentator:generate --output=public/openapi.json
 php artisan documentator:generate --format=json-api
 ```
 
-- `--output` overrides `output.path`.
-- `--format` overrides `format` (`simple`, `json-api`, or a configured custom format).
+Relative output paths are resolved from your application's root. Use verbose output to see processed routes and extraction diagnostics:
 
-> [!NOTE]
-> If `--format` is invalid, generation fails with an `Unknown format` exception.
+```bash
+php artisan documentator:generate -v
+```
 
-## What the Command Does
+## Checking Shared Parameters
 
-1. Collects routes using `routes.include`, `routes.exclude`, and `routes.exclude_middleware`.
-2. Builds operations for allowed HTTP methods.
-3. Adds schemas, responses, tags, and security components.
-4. Writes the final spec file.
+Check that query parameters and headers use consistent types and descriptions across endpoints:
 
-## Command Output
+```bash
+php artisan documentator:lint
+```
 
-The command prints:
+The command returns a non-zero exit code when it finds differences. Use [presets](phpdoc-annotations.md#presets) to share repeated definitions.
 
-- processed routes and endpoints,
-- schema/response/tag counters,
-- output file path and file size,
-- warnings when no matching routes were found.
-
-> [!WARNING]
-> A generated file with empty `paths` usually means routes were filtered out or use unsupported action patterns.
+Both commands can run in CI. Generation returns a non-zero exit code when it cannot build or write the specification.

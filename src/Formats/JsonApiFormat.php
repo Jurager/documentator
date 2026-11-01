@@ -4,14 +4,13 @@ namespace Jurager\Documentator\Formats;
 
 class JsonApiFormat extends AbstractFormat
 {
-    public function name(): string
-    {
-        return 'json-api';
-    }
+    protected string $mediaType = 'application/vnd.api+json';
 
-    public function description(): string
+    public function response(string $resource, array $data = [], bool $collection = false): array
     {
-        return 'JSON:API Specification (https://jsonapi.org)';
+        $schema = $this->documentSchema($resource, $this->getAttributes($data), $data['relationships'] ?? [], $collection);
+
+        return ['content' => [$this->mediaType => ['schema' => $schema]]];
     }
 
     protected function successSchema(): string
@@ -47,7 +46,7 @@ class JsonApiFormat extends AbstractFormat
                     'data' => ['oneOf' => [
                         ['$ref' => '#/components/schemas/JsonApiResource'],
                         ['type' => 'array', 'items' => ['$ref' => '#/components/schemas/JsonApiResource']],
-                        ['type' => 'null'],
+                        ['type' => 'object', 'nullable' => true, 'enum' => [null]],
                     ]],
                     'included' => ['type' => 'array', 'items' => ['$ref' => '#/components/schemas/JsonApiResource']],
                     'links' => ['type' => 'object', 'properties' => [
@@ -95,206 +94,81 @@ class JsonApiFormat extends AbstractFormat
         ];
     }
 
-    public function operationResponse(string $method, string $resource, ?array $responseData = null, bool $isCollection = false): array
+    protected function documentSchema(string $resource, array $attributes, array $relationships, bool $collection): array
     {
-        $status = match ($method) {
-            'post' => '201',
-            'delete' => '204',
-            default => '200',
-        };
-
-        if ($status === '204') {
-            return [$status => ['description' => 'No Content']];
-        }
-
-        $attributes = $this->getAttributes($responseData);
-        $relationships = $this->getRelationships($responseData);
-
-        return [$status => [
-            'description' => match ($status) {
-                '201' => 'Resource created',
-                default => 'Success',
-            },
-            'content' => [
-                'application/vnd.api+json' => [
-                    'schema' => $this->buildResponseSchema($resource, $attributes, $relationships, $isCollection),
-                ],
-            ],
-        ]];
-    }
-
-    private function buildResponseSchema(string $resource, array $attributes, array $relationships, bool $isCollection): array
-    {
-        $resourceSchema = $this->buildResourceSchema($resource, $attributes, $relationships);
-
-        if ($isCollection) {
-            return [
-                'type' => 'object',
-                'required' => ['data'],
-                'properties' => [
-                    'data' => [
-                        'type' => 'array',
-                        'items' => $resourceSchema,
-                    ],
-                    'links' => [
-                        'type' => 'object',
-                        'properties' => [
-                            'self' => ['type' => 'string'],
-                            'first' => ['type' => 'string'],
-                            'last' => ['type' => 'string'],
-                            'prev' => ['type' => 'string', 'nullable' => true],
-                            'next' => ['type' => 'string', 'nullable' => true],
-                        ],
-                    ],
-                    'meta' => [
-                        'type' => 'object',
-                        'properties' => [
-                            'total' => ['type' => 'integer'],
-                            'page' => ['type' => 'integer'],
-                            'per_page' => ['type' => 'integer'],
-                        ],
-                    ],
-                ],
-                'example' => $this->buildCollectionExample($resource, $attributes, $relationships),
-            ];
-        }
-
-        return [
+        $item = $this->resourceSchema($resource, $attributes, $relationships);
+        $schema = [
             'type' => 'object',
             'required' => ['data'],
             'properties' => [
-                'data' => $resourceSchema,
-            ],
-            'example' => [
-                'data' => $this->buildResourceExample($resource, $attributes, $relationships, 1),
-            ],
-        ];
-    }
-
-    private function buildResourceSchema(string $resource, array $attributes, array $relationships): array
-    {
-        // Build attributes properties
-        $attrProps = [];
-        foreach ($attributes as $name => $config) {
-            if ($name === 'id') {
-                continue;
-            }
-            $attrProps[$name] = ['type' => $config['type'] ?? 'string'];
-        }
-
-        $schema = [
-            'type' => 'object',
-            'required' => ['type', 'id'],
-            'properties' => [
-                'type' => ['type' => 'string', 'example' => $resource],
-                'id' => ['type' => 'string', 'example' => '1'],
-                'attributes' => [
-                    'type' => 'object',
-                    'properties' => $attrProps ?: null,
-                ],
-                'links' => [
-                    'type' => 'object',
-                    'properties' => [
-                        'self' => ['type' => 'string', 'example' => "/$resource/1"],
-                    ],
-                ],
+                'data' => $collection ? ['type' => 'array', 'items' => $item] : $item,
             ],
         ];
 
-        // Add relationships if present
-        if (! empty($relationships)) {
-            $relProps = [];
-            foreach ($relationships as $name => $rel) {
-                $relProps[$name] = [
-                    'type' => 'object',
-                    'properties' => [
-                        'data' => $rel['collection']
-                            ? ['type' => 'array', 'items' => $this->buildRelationshipLinkage($rel['type'])]
-                            : $this->buildRelationshipLinkage($rel['type']),
-                        'links' => [
-                            'type' => 'object',
-                            'properties' => [
-                                'related' => ['type' => 'string'],
-                            ],
-                        ],
-                    ],
-                ];
-            }
-
-            $schema['properties']['relationships'] = [
+        if ($collection) {
+            $schema['properties']['links'] = [
                 'type' => 'object',
-                'properties' => $relProps,
+                'properties' => [
+                    'self' => ['type' => 'string'],
+                    'first' => ['type' => 'string'],
+                    'last' => ['type' => 'string'],
+                    'prev' => ['type' => 'string', 'nullable' => true],
+                    'next' => ['type' => 'string', 'nullable' => true],
+                ],
+            ];
+            $schema['properties']['meta'] = [
+                'type' => 'object',
+                'properties' => [
+                    'total' => ['type' => 'integer'],
+                    'page' => ['type' => 'integer'],
+                    'per_page' => ['type' => 'integer'],
+                ],
             ];
         }
 
-        return array_filter($schema, fn ($v) => $v !== null);
+        return $schema;
     }
 
-    private function buildRelationshipLinkage(string $type): array
+    protected function resourceSchema(string $resource, array $attributes, array $relationships): array
+    {
+        unset($attributes['id']);
+        $schema = $this->identifierSchema($resource);
+        $schema['properties']['attributes'] = ['type' => 'object', 'properties' => $attributes ?: (object) []];
+        $schema['properties']['links'] = ['type' => 'object', 'properties' => ['self' => ['type' => 'string']]];
+
+        if ($relationships !== []) {
+            $schema['properties']['relationships'] = $this->relationshipsSchema($relationships);
+        }
+
+        return $schema;
+    }
+
+    protected function relationshipsSchema(array $relationships): array
+    {
+        $properties = [];
+
+        foreach ($relationships as $name => $relationship) {
+            $identifier = $this->identifierSchema($relationship['type']);
+            $properties[$name] = [
+                'type' => 'object',
+                'properties' => [
+                    'data' => $relationship['collection'] ? ['type' => 'array', 'items' => $identifier] : $identifier,
+                    'links' => ['type' => 'object', 'properties' => ['related' => ['type' => 'string']]],
+                ],
+            ];
+        }
+
+        return ['type' => 'object', 'properties' => $properties];
+    }
+
+    protected function identifierSchema(string $type): array
     {
         return [
             'type' => 'object',
             'required' => ['type', 'id'],
             'properties' => [
-                'type' => ['type' => 'string', 'example' => $type],
-                'id' => ['type' => 'string', 'example' => '1'],
-            ],
-        ];
-    }
-
-    private function buildResourceExample(string $resource, array $attributes, array $relationships, int $id): array
-    {
-        $example = $this->examples->generateJsonApiResource($resource, $attributes, $id);
-
-        // Add relationships to example
-        if (! empty($relationships)) {
-            $example['relationships'] = [];
-
-            foreach ($relationships as $name => $rel) {
-                $relType = $rel['type'];
-
-                if ($rel['collection']) {
-                    $example['relationships'][$name] = [
-                        'data' => [
-                            ['type' => $relType, 'id' => '1'],
-                            ['type' => $relType, 'id' => '2'],
-                        ],
-                        'links' => [
-                            'related' => "/$resource/$id/$name",
-                        ],
-                    ];
-                } else {
-                    $example['relationships'][$name] = [
-                        'data' => ['type' => $relType, 'id' => '1'],
-                        'links' => [
-                            'related' => "/$resource/$id/$name",
-                        ],
-                    ];
-                }
-            }
-        }
-
-        return $example;
-    }
-
-    private function buildCollectionExample(string $resource, array $attributes, array $relationships): array
-    {
-        return [
-            'data' => [
-                $this->buildResourceExample($resource, $attributes, $relationships, 1),
-                $this->buildResourceExample($resource, $attributes, $relationships, 2),
-            ],
-            'links' => [
-                'self' => "/$resource?page[number]=1",
-                'first' => "/$resource?page[number]=1",
-                'last' => "/$resource?page[number]=7",
-                'prev' => null,
-                'next' => "/$resource?page[number]=2",
-            ],
-            'meta' => [
-                'total' => 100,
-                'page' => 1,
-                'per_page' => 15,
+                'type' => ['type' => 'string', 'enum' => [$type]],
+                'id' => ['type' => 'string'],
             ],
         ];
     }

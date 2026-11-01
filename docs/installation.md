@@ -5,35 +5,26 @@ weight: 20
 
 # Installation
 
-## Install Package
+Documentator requires PHP 8.3+ and Laravel 10–13. Install it using Composer:
 
 ```bash
 composer require jurager/documentator
 ```
 
-## Publish Configuration
-
-```bash
-php artisan vendor:publish --tag=documentator-config
-```
-
-This creates `config/documentator.php`.
-
-## Verify Command
-
-```bash
-php artisan list | grep documentator:generate
-```
-
-## First Generation
+Generate your first specification:
 
 ```bash
 php artisan documentator:generate
 ```
 
-Default output path:
+The command includes routes matching `api/*` and writes `docs/openapi.json`.
 
-`docs/openapi.json`
+## Configuration
 
-> [!NOTE]
-> Before first generation, verify `routes.include` in `config/documentator.php` matches your API route prefixes.
+To change the included routes, API title, or output path, publish the configuration:
+
+```bash
+php artisan vendor:publish --tag=documentator-config
+```
+
+You may now update `config/documentator.php`. See [Configuration](configuration.md) for common settings.

@@ -1,41 +1,67 @@
 ---
-title: Schema Detection
+title: Request and Response Schemas
 weight: 50
 ---
 
-# Schema Detection
+# Request and Response Schemas
 
-Documentator builds request and response schemas from your Laravel code.
+Documentator reads request fields from validation rules and response fields from API resources.
 
-## Request Schema Sources
+## Request Fields
 
-- `FormRequest::rules()` from controller method parameters.
-- Inline validation from `$request->validate([...])` calls.
-- `@bodyParam` tags in PHPDoc.
+Type-hint a FormRequest on your controller action:
 
-For `POST`, `PUT`, and `PATCH`, request body schemas are generated and referenced as OpenAPI components.
+```php
+public function store(StoreUserRequest $request): UserResource
+{
+    return new UserResource(User::create($request->validated()));
+}
+```
 
-> [!WARNING]
-> Inline validation extraction is based on static parsing of `$request->validate([...])`. Highly dynamic rule construction may not be detected.
+Its rules describe the request body:
 
-## Response Schema Sources
+```php
+public function rules(): array
+{
+    return [
+        'name' => ['required', 'string', 'max:100'],
+        'email' => ['required', 'email'],
+        'roles' => ['array'],
+        'roles.*' => ['string'],
+    ];
+}
+```
 
-- Resource class return type on controller methods.
-- `Resource::make(...)`, `Resource::collection(...)`, or `new Resource(...)` usage in method body.
-- Fallback resource class guessing from route segment + configured namespaces.
+Inline `$request->validate([...])` rules are also supported. Request bodies are generated for POST, PUT, PATCH, and DELETE operations.
 
-If no resource is detected, format-level generic examples are used.
+Use [`@bodyParam`](phpdoc-annotations.md#request-fields) for descriptions, examples, or fields that depend on runtime data. Dynamic rules may require explicit documentation.
 
-> [!NOTE]
-> Resource detection checks return types, `Resource::make(...)`, `Resource::collection(...)`, `new Resource(...)`, and `::class` usage in method body.
+## Nested Fields and Files
 
-## Route Parameters
+Use Laravel's dot notation for objects and array items:
 
-Path parameters from route URIs are always added to operation parameters and removed from generated request body schema.
+```php
+return [
+    'address.city' => ['required', 'string'],
+    'items' => ['required', 'array'],
+    'items.*.id' => ['required', 'integer'],
+    'attachment' => ['file'],
+];
+```
 
-## Explicit Responses
+File fields produce a `multipart/form-data` request body. Path parameters are documented separately from body fields.
 
-If PHPDoc contains `@response`, those responses take priority over auto-generated format responses.
+## Response Fields
 
-> [!WARNING]
-> When `@response` is used, generator outputs your explicit example as-is and skips automatic format envelope generation for that status set.
+Return an API resource or resource collection from your controller:
+
+```php
+public function show(User $user): UserResource
+{
+    return new UserResource($user);
+}
+```
+
+Documentator discovers resources from return types and resource calls such as `UserResource::collection(...)`. It reads resource fields without executing `toArray()`. Nested arrays, explicit PHP casts, and supported Eloquent casts describe field types; names provide a fallback.
+
+Choose the [response format](response-formats.md) matching your API. Use [`@response`](phpdoc-annotations.md#response-examples) when an endpoint needs a specific response example.

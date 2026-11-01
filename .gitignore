@@ -2,6 +2,7 @@
 .editorconfig
 /vendor
 composer.lock
-pint.json
 /phpunit.xml
 .phpunit.result.cache
+/.phpunit.cache
+/coverage

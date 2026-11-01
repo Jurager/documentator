@@ -3,23 +3,14 @@ title: Documentator
 weight: 1
 ---
 
-This documentation explains how to install, configure, and use Jurager/Documentator.
+Generate OpenAPI 3.0 documentation from your Laravel application.
 
-## Getting Started
+Start with [Installation](installation.md), then [generate your specification](generate-specification.md).
 
-- [Introduction](introduction.md) - What the package does and when to use it.
-- [Installation](installation.md) - Install the package and publish config.
-- [Configuration](configuration.md) - Configure OpenAPI metadata, routes, security, and output.
-
-## Guides
-
-- [Generate Specification](generate-specification.md) - Run `documentator:generate` and use command options.
-- [Schema Detection](schema-detection.md) - How validation and resources are converted to schemas.
-- [PHPDoc Annotations](phpdoc-annotations.md) - Supported endpoint annotations.
-- [Response Formats](response-formats.md) - Built-in formats and custom format classes.
-
-## Reference
-
-- [Validation Rules Mapping](validation-rules-mapping.md) - Validation-to-OpenAPI rule mapping.
-- [API Reference](api-reference.md) - Package classes and extension points.
-- [Troubleshooting](troubleshooting.md) - Common issues and fixes.
+- [Configuration](configuration.md) — choose routes, servers, and authentication.
+- [Request and Response Schemas](schema-detection.md) — use validation rules and API resources.
+- [Documenting Endpoints](phpdoc-annotations.md) — add descriptions, parameters, and examples.
+- [Response Formats](response-formats.md) — choose the envelope used by your API.
+- [Validation Rules](validation-rules-mapping.md) — see how rules describe request fields.
+- [Using PHP](api-reference.md) — generate a specification from application code.
+- [Troubleshooting](troubleshooting.md) — resolve missing routes and fields.

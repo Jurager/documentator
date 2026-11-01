@@ -1,6 +1,13 @@
 <?php
 
 return [
+    'success_response' => 'Успешный ответ',
+    'created_response' => 'Ресурс создан',
+    'bad_request' => 'Некорректный запрос',
+    'unauthorized' => 'Требуется авторизация',
+    'not_found' => 'Не найдено',
+    'validation_error' => 'Ошибка валидации',
+    'no_content' => 'Нет содержимого',
     'list' => 'Список :resource',
     'get' => 'Получить :resource',
     'create' => 'Создать :resource',

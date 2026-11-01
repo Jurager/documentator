@@ -5,36 +5,30 @@ weight: 100
 
 # Troubleshooting
 
-## No Routes Found
+## Missing Routes
 
-If generation finishes with no routes:
+Run `php artisan route:list` and check the route URI against `routes.include`, `routes.exclude`, `routes.exclude_middleware`, and `routes.methods`.
 
-1. Check `routes.include` patterns.
-2. Verify routes are registered with `php artisan route:list`.
-3. Ensure routes are not filtered by `routes.exclude`.
-4. Ensure methods are allowed by `routes.methods`.
+Closure routes receive generated operations. Use controller methods to supply PHPDoc, FormRequest rules, and resource information.
 
-## Endpoints Missing in `paths`
+## Missing Request Fields
 
-1. Ensure route actions point to controller methods (not closures).
-2. Confirm controller class/method exists and is autoloadable.
-3. Verify route HTTP methods are in `routes.methods`.
+Run `php artisan documentator:generate -v` to see extraction diagnostics. Add rules to your FormRequest or an inline `$request->validate([...])` call. For rules that depend on request data or database state, add `@bodyParam` annotations.
 
-## Request Body Schema Is Empty
+Request bodies are generated for POST, PUT, PATCH, and DELETE. Route placeholders are documented as path parameters.
 
-1. Ensure validation is in `FormRequest::rules()` or `$request->validate([...])`.
-2. For nested objects/arrays, verify rule keys and PHPDoc body params are aligned.
-3. Check that path params are not expected in request body.
+## Unexpected Responses
 
-## Authentication Incorrectly Marked
+Select the format matching your API: `simple` or `json-api`. Add `@response` when an endpoint returns another shape or status.
 
-- Use `@unauthenticated` for public endpoints.
-- Verify `security.default` and `security.schemes` in config.
+## Public Endpoints Require Authentication
 
-## Unknown Format Error
+Add `@unauthenticated` to the controller method. To remove default authentication from every endpoint, set `security.default` to `[]`.
 
-If generator throws unknown format:
+## Unknown Format
 
-1. Check `format` key in config.
-2. Register custom class in `custom_formats`.
-3. Confirm class exists and implements `AbstractFormatInterface`.
+Check that the format is `simple`, `json-api`, or a custom format class. Custom classes must implement `Contracts\ResponseFormat`. Select a custom format by its class name.
+
+## Inconsistent Parameters
+
+Run `php artisan documentator:lint` to locate differences. Share repeated definitions through [presets](phpdoc-annotations.md#presets).

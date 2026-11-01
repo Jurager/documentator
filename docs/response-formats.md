@@ -5,79 +5,51 @@ weight: 70
 
 # Response Formats
 
-Documentator supports pluggable response formats.
+Choose the format matching the responses your API returns. This setting changes the generated documentation.
 
-## Built-in Formats
+## Simple Responses
 
-- `simple` - REST-style envelope with `success`, `data`, `meta`.
-- `json-api` - JSON:API media type and document structure.
+The default format describes responses with a `success` flag and `data`:
 
-Set in config:
-
-```php
-'format' => env('OPENAPI_FORMAT', 'simple'),
-```
-
-Override at runtime:
-
-```bash
-php artisan documentator:generate --format=json-api
-```
-
-## Register Custom Format
-
-1. Create a class implementing `Jurager\Documentator\Formats\AbstractFormatInterface`
-   (usually extend `AbstractFormat`).
-2. Register it in `custom_formats`.
-3. Select the key in `format`.
-
-```php
-'custom_formats' => [
-    'telegram' => App\Documentator\TelegramFormat::class,
-],
-'format' => 'telegram',
-```
-
-Example skeleton:
-
-```php
-namespace App\Documentator;
-
-use Jurager\Documentator\Builders\SchemaBuilder;
-use Jurager\Documentator\Formats\AbstractFormat;
-
-class TelegramFormat extends AbstractFormat
+```json
 {
-    public function __construct(SchemaBuilder $schemaBuilder)
-    {
-        parent::__construct($schemaBuilder);
-    }
+    "success": true,
+    "data": {"id": 42, "name": "Alice"}
+}
+```
 
-    public function name(): string
-    {
-        return 'telegram';
-    }
+Collections contain a `data` array and pagination metadata.
 
-    public function description(): string
-    {
-        return 'Telegram Bot API style responses';
-    }
+## JSON:API Responses
 
-    protected function successSchema(): string
-    {
-        return 'TelegramSuccess';
-    }
+Select `JsonApiFormat` in your configuration:
 
-    protected function errorSchema(): string
-    {
-        return 'TelegramError';
+```php
+'format' => Jurager\Documentator\Formats\JsonApiFormat::class,
+```
+
+Responses use the `application/vnd.api+json` media type:
+
+```json
+{
+    "data": {
+        "type": "users",
+        "id": "42",
+        "attributes": {"name": "Alice"}
     }
 }
 ```
 
-## Class-Based Format Selection
+POST success is documented as 201, DELETE success as 204 without a body, and other operations as 200. Use [`@response`](phpdoc-annotations.md#response-examples) to describe exceptions.
 
-You can also set `format` to a fully-qualified class name.
+## Custom Formats
 
-> [!WARNING]
-> `SpecificationBuilder` resolves custom formats as `new $format($schemaBuilder)`, so constructor signature must be compatible.
+Extend a built-in format or implement `Jurager\Documentator\Contracts\ResponseFormat`. Select the class directly:
+
+```php
+'format' => App\OpenApi\AcmeFormat::class,
+```
+
+Laravel resolves the format, so you may use ordinary constructor injection.
+
+A format provides `schemas()`, `responses()`, and `response(string $resource, array $data = [], bool $collection = false)`. The `response()` method returns OpenAPI response fields such as `content`; generation selects the HTTP status and adds examples.

@@ -5,26 +5,10 @@ weight: 10
 
 # Introduction
 
-Jurager/Documentator generates OpenAPI 3 specifications from Laravel routes.
+Documentator generates an OpenAPI 3.0 specification from your Laravel routes. It reads controller documentation, validation rules, and API resources, so you can describe your API alongside the code that implements it.
 
-It scans route actions, PHPDoc tags, validation rules, and API Resources to produce endpoint documentation with request/response schemas.
+Run `php artisan documentator:generate` to create `docs/openapi.json`. Import this file into your API documentation viewer or client.
 
-## Key Capabilities
+Start with your existing FormRequests and resources. Add PHPDoc descriptions and examples where the generated documentation needs more context.
 
-- Build OpenAPI from discovered Laravel routes.
-- Extract request schemas from `FormRequest` and `$request->validate([...])` rules.
-- Build response examples from Resource classes.
-- Use PHPDoc tags like `@summary`, `@group`, `@queryParam`, and `@response`.
-- Support response envelope formats: `simple` and `json-api`.
-
-## When To Use
-
-- You want API documentation generated from existing controller code.
-- You need a repeatable command for OpenAPI generation in CI/CD.
-- You want docs and schema output to stay aligned with validation rules.
-
-## Requirements
-
-- PHP >= 8.2
-- Laravel 10+
-- Composer
+The package requires PHP 8.3+ and Laravel 10–13. Continue with [Installation](installation.md).

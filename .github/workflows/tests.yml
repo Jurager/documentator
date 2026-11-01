@@ -1,0 +1,58 @@
+name: Tests
+
+on: [push, pull_request]
+
+jobs:
+  tests:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - php: '8.3'
+            laravel: '10.*'
+            testbench: '8.*'
+            pest: '2.*'
+            composer_flags: '--no-security-blocking'
+          - php: '8.3'
+            laravel: '11.*'
+            testbench: '9.*'
+            pest: '3.*'
+            composer_flags: '--no-security-blocking'
+          - php: '8.3'
+            laravel: '12.*'
+            testbench: '10.*'
+            pest: '3.*'
+          - php: '8.4'
+            laravel: '13.*'
+            testbench: '11.*'
+            pest: '4.*'
+          - php: '8.5'
+            laravel: '13.*'
+            testbench: '11.*'
+            pest: '4.*'
+    name: PHP ${{ matrix.php }} / Laravel ${{ matrix.laravel }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: shivammathur/setup-php@v2
+        with:
+          php-version: ${{ matrix.php }}
+          coverage: xdebug
+          extensions: mbstring, dom, fileinfo, pdo_sqlite
+      - run: composer update --prefer-dist --no-interaction ${{ matrix.composer_flags }} --with "laravel/framework:${{ matrix.laravel }}" --with "orchestra/testbench:${{ matrix.testbench }}" --with "pestphp/pest:${{ matrix.pest }}"
+      - run: composer test -- --coverage-clover=coverage/clover.xml
+      - uses: actions/upload-artifact@v4
+        with:
+          name: coverage-${{ strategy.job-index }}
+          path: coverage/clover.xml
+  style:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.4'
+          coverage: none
+      - run: composer update --prefer-dist --no-interaction
+      - run: composer format:test
+      - run: composer audit
