@@ -1,15 +1,13 @@
 ---
 title: Request and Response Schemas
-weight: 50
+weight: 40
 ---
 
 # Request and Response Schemas
 
-Documentator reads request fields from validation rules and response fields from API resources.
+## Request Bodies
 
-## Request Fields
-
-Type-hint a FormRequest on your controller action:
+Type-hint a FormRequest on your controller method to document its request fields:
 
 ```php
 public function store(StoreUserRequest $request): UserResource
@@ -18,7 +16,7 @@ public function store(StoreUserRequest $request): UserResource
 }
 ```
 
-Its rules describe the request body:
+The request's validation rules describe the body:
 
 ```php
 public function rules(): array
@@ -26,19 +24,15 @@ public function rules(): array
     return [
         'name' => ['required', 'string', 'max:100'],
         'email' => ['required', 'email'],
-        'roles' => ['array'],
-        'roles.*' => ['string'],
     ];
 }
 ```
 
-Inline `$request->validate([...])` rules are also supported. Request bodies are generated for POST, PUT, PATCH, and DELETE operations.
-
-Use [`@bodyParam`](phpdoc-annotations.md#request-fields) for descriptions, examples, or fields that depend on runtime data. Dynamic rules may require explicit documentation.
+Inline `$request->validate([...])` rules are also supported. Bodies are generated for POST, PUT, PATCH, and DELETE operations. Use [`@bodyParam`](phpdoc-annotations.md#request-fields) for fields that depend on request data.
 
 ## Nested Fields and Files
 
-Use Laravel's dot notation for objects and array items:
+Use dot notation for nested fields and `*` for array items:
 
 ```php
 return [
@@ -49,11 +43,36 @@ return [
 ];
 ```
 
-File fields produce a `multipart/form-data` request body. Path parameters are documented separately from body fields.
+File fields produce a `multipart/form-data` request body. Route parameters are documented separately.
 
-## Response Fields
+## Validation Rules
 
-Return an API resource or resource collection from your controller:
+| Rule | OpenAPI Type |
+| --- | --- |
+| `integer`, `int` | `integer` |
+| `numeric`, `decimal`, `float`, `double`, `number` | `number` |
+| `boolean`, `bool` | `boolean` |
+| `array` | `array` |
+| `object` | `object` |
+| `string`, `json`, `file`, `image` | `string` |
+
+The `email`, `url`, `uuid`, and `date` rules add formats. File and image fields use the `binary` format.
+
+The `required`, `nullable`, `min`, `max`, and `in` rules describe field constraints. A `sometimes|required` field remains optional. File size constraints are not converted to string lengths.
+
+## Custom Rule Types
+
+Add application-specific rule types to the `type_map` option in `config/documentator.php`:
+
+```php
+'type_map' => [
+    'money' => 'number',
+],
+```
+
+## API Resources
+
+Return an API resource from your controller to document response fields:
 
 ```php
 public function show(User $user): UserResource
@@ -62,6 +81,21 @@ public function show(User $user): UserResource
 }
 ```
 
-Documentator discovers resources from return types and resource calls such as `UserResource::collection(...)`. It reads resource fields without executing `toArray()`. Nested arrays, explicit PHP casts, and supported Eloquent casts describe field types; names provide a fallback.
+Resource collections created with `UserResource::collection(...)` are also supported. Nested arrays, PHP casts, and Eloquent casts provide field types.
 
-Choose the [response format](response-formats.md) matching your API. Use [`@response`](phpdoc-annotations.md#response-examples) when an endpoint needs a specific response example.
+Choose the [response format](response-formats.md) used by your API. Use [`@response`](phpdoc-annotations.md#responses) for responses that need an explicit example.
+
+## Resource Discovery
+
+To discover resources and models in other namespaces, add them to the `resources.namespaces` option:
+
+```php
+'resources' => [
+    'namespaces' => [
+        'App\\Http\\Resources',
+        'App\\Models',
+        'Domain\\Catalog\\Resources',
+        'Domain\\Catalog\\Models',
+    ],
+],
+```

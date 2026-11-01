@@ -1,25 +1,20 @@
 ---
 title: Configuration
-weight: 30
+weight: 20
 ---
 
 # Configuration
 
-Publish `config/documentator.php` to customize generation:
-
-```bash
-php artisan vendor:publish --tag=documentator-config
-```
+The following options are defined in your published `config/documentator.php` file.
 
 ## API Information
 
-Set the name and version shown in your documentation:
+The `info` and `servers` options describe your API and its base URLs:
 
 ```php
 'info' => [
     'title' => 'Acme API',
     'version' => '1.0.0',
-    'description' => 'Manage your Acme account.',
 ],
 
 'servers' => [
@@ -27,11 +22,9 @@ Set the name and version shown in your documentation:
 ],
 ```
 
-Documentator generates OpenAPI 3.0.x documents.
-
 ## Routes
 
-Choose routes using URI patterns. Excluded routes take priority over included routes:
+Use URI patterns to choose which routes to document. Exclusions take precedence over inclusions:
 
 ```php
 'routes' => [
@@ -44,7 +37,7 @@ Choose routes using URI patterns. Excluded routes take priority over included ro
 
 ## Authentication
 
-The default configuration documents bearer authentication. Define the schemes used by your API and select their defaults:
+The default specification uses bearer authentication. Configure the schemes used by your API:
 
 ```php
 'security' => [
@@ -58,59 +51,47 @@ The default configuration documents bearer authentication. Define the schemes us
 ],
 ```
 
-Add `@unauthenticated` to public endpoints. Set `security.default` to `[]` when your API has no default authentication.
+Use [`@unauthenticated`](phpdoc-annotations.md#authentication) for public endpoints. To omit default authentication, set `security.default` to `[]`.
 
 ## Output
 
-The command writes JSON to the configured path, relative to your application:
+The `output` option controls the generated JSON file. Relative paths are resolved from your application root:
 
 ```php
 'output' => [
-    'path' => 'public/openapi.json',
+    'path' => 'docs/openapi.json',
     'pretty_print' => true,
 ],
 ```
 
-You may also pass `--output=public/openapi.json` when running the command.
+## Examples
 
-## Response Format
-
-Choose the format matching your API's responses:
+Automatic examples use a fixed seed for repeatable output:
 
 ```php
-'format' => Jurager\Documentator\Formats\SimpleFormat::class,
+'examples' => [
+    'enabled' => true,
+    'seed' => 0,
+],
 ```
 
-See [Response Formats](response-formats.md) for examples and custom formats.
+Set `enabled` to `false` to omit automatic examples. Explicit PHPDoc examples are preserved. Set `seed` to another integer for different values, or `null` for random values.
 
-## Resource Discovery
+## Tags
 
-Add namespaces when your resources or models live outside Laravel's default directories:
+Use [`@group`](phpdoc-annotations.md#grouping-endpoints) to group endpoints. Add descriptions for these groups using the `tags.definitions` option:
 
 ```php
-'resources' => [
-    'namespaces' => [
-        'App\\Http\\Resources',
-        'App\\Models',
-        'Domain\\Catalog\\Resources',
-        'Domain\\Catalog\\Models',
+'tags' => [
+    'definitions' => [
+        'Users' => 'Manage users and their profiles.',
     ],
 ],
 ```
 
-## Tags and Default Responses
+## Default Responses
 
-Use `@group Users` to group endpoints. You may add descriptions for those groups:
-
-```php
-'tags' => [
-    'auto_generate' => true,
-    'definitions' => ['Users' => 'Manage users and their profiles.'],
-    'sort' => true,
-],
-```
-
-To document a response on every operation, add a reusable response reference:
+To document a response on every operation, add it to the `responses.default` option:
 
 ```php
 'responses' => [
@@ -120,19 +101,4 @@ To document a response on every operation, add a reusable response reference:
 ],
 ```
 
-For shared parameters, see [Presets](phpdoc-annotations.md#presets). To customize field types, see [Validation Rules](validation-rules-mapping.md).
-
-## Examples
-
-Automatic examples use a fixed seed so repeated generation produces the same document:
-
-```php
-'examples' => [
-    'enabled' => true,
-    'seed' => 0,
-],
-```
-
-Set `enabled` to `false` to omit automatic examples. Explicit PHPDoc examples are kept. Use another integer seed for different sample values, or `null` for unseeded generation.
-
-Descriptions use your application's active locale. Faker uses `app.faker_locale`.
+The built-in formats provide the `Unauthorized` response. You may also define responses in a [custom format](response-formats.md#custom-formats).

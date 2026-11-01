@@ -1,41 +1,49 @@
 ---
 title: Generating Documentation
-weight: 40
+weight: 30
 ---
 
 # Generating Documentation
 
-Generate a specification from your application's registered routes:
+## Generating a Specification
 
-```bash
+Run the `documentator:generate` Artisan command after updating your API:
+
+```shell
 php artisan documentator:generate
 ```
 
-The command writes `docs/openapi.json` and displays the number of routes it processed. Run it again after changing your API.
+The specification is written to `docs/openapi.json`. Use the `--output` option to choose another path or `--format` to select a [response format](response-formats.md):
 
-## Command Options
-
-Use `--output` to choose another destination and `--format` to override the configured response format:
-
-```bash
+```shell
 php artisan documentator:generate --output=public/openapi.json
 php artisan documentator:generate --format=json-api
 ```
 
-Relative output paths are resolved from your application's root. Use verbose output to see processed routes and extraction diagnostics:
+Use verbose output to inspect processed routes and fields that could not be documented:
 
-```bash
+```shell
 php artisan documentator:generate -v
 ```
 
-## Checking Shared Parameters
+If a route is missing, check `php artisan route:list` and your [route configuration](configuration.md#routes). Controller methods provide PHPDoc, validation rules, and resource information; closure routes receive basic generated operations.
 
-Check that query parameters and headers use consistent types and descriptions across endpoints:
+## Generating from Code
 
-```bash
+The `generate` method returns the specification as an array using the same configuration:
+
+```php
+use Jurager\Documentator\Documentator;
+
+$specification = app(Documentator::class)->generate();
+```
+
+## Checking Parameters
+
+The `documentator:lint` command checks shared query parameters and headers for inconsistent types or descriptions:
+
+```shell
 php artisan documentator:lint
 ```
 
-The command returns a non-zero exit code when it finds differences. Use [presets](phpdoc-annotations.md#presets) to share repeated definitions.
-
-Both commands can run in CI. Generation returns a non-zero exit code when it cannot build or write the specification.
+Use [presets](phpdoc-annotations.md#presets) to share parameter definitions. The command returns a non-zero exit code when it finds differences. Generation returns a non-zero exit code when it cannot build or write the specification.
